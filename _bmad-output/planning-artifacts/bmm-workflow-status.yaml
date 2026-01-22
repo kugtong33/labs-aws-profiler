@@ -1,0 +1,10 @@
+# BMM Workflow Status
+# Tracks completion of BMM workflows for labs-aws-profiler
+
+workflow_status:
+  product-brief: "_bmad-output/planning-artifacts/product-brief-labs-aws-profiler-2026-01-22.md"
+
+completion_log:
+  - workflow: product-brief
+    completed_at: 2026-01-22
+    output_file: "_bmad-output/planning-artifacts/product-brief-labs-aws-profiler-2026-01-22.md"
