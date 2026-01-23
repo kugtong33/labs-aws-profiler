@@ -1,6 +1,6 @@
 # Story 1.2: List Available Profiles
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -272,7 +272,8 @@ Codex (GPT-5)
 ### Completion Notes List
 
 - Implemented `awsprof_cmd_list()` and added main dispatch `list` command with help text.
-- Added command tests covering valid, missing, and empty credentials files plus perf check.
+- Added large-profile fixture and assertions for 100+ profiles, plus stderr-clean assertion.
+- Hardened awk parsing exit handling under `set -e` to preserve exit-code contract.
 - Verified tests: INI parsing and command tests both pass.
 
 ### File List
@@ -280,6 +281,7 @@ Codex (GPT-5)
 - awsprof
 - tests/test_commands.sh
 - tests/fixtures/credentials_empty.mock
+- tests/fixtures/credentials_many.mock
 
 ### Change Log
 

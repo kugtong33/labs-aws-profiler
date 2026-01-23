@@ -79,13 +79,22 @@ else
     fail "awsprof_ini_read_section should fail without section"
 fi
 
-# Test 7: Handle malformed INI gracefully
+# Test 7: Handle malformed INI gracefully (list sections)
 ((TESTS_RUN++))
 result=$(awsprof_ini_list_sections "${SCRIPT_DIR}/fixtures/credentials_malformed.mock" 2>&1) && exit_code=0 || exit_code=$?
-if [[ $exit_code -eq 0 ]] && [[ "$result" == *"default"* ]]; then
-    pass "awsprof_ini_list_sections handles malformed INI"
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"Malformed INI section header"* ]]; then
+    pass "awsprof_ini_list_sections reports malformed INI"
 else
-    fail "awsprof_ini_list_sections should handle malformed INI gracefully"
+    fail "awsprof_ini_list_sections should report malformed INI"
+fi
+
+# Test 8: Handle malformed INI gracefully (read section)
+((TESTS_RUN++))
+result=$(awsprof_ini_read_section "default" "${SCRIPT_DIR}/fixtures/credentials_malformed.mock" 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"Malformed INI section header"* ]]; then
+    pass "awsprof_ini_read_section reports malformed INI"
+else
+    fail "awsprof_ini_read_section should report malformed INI"
 fi
 
 echo

@@ -1,6 +1,6 @@
 # Story 1.4: Show Current Profile
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -315,7 +315,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 
 ### Debug Log References
 
-No issues encountered during implementation. All tests passed on first run.
+- Tests: `bash tests/test_commands.sh`
 
 ### Completion Notes List
 
@@ -332,7 +332,7 @@ No issues encountered during implementation. All tests passed on first run.
    - Test with empty AWS_PROFILE (handles gracefully)
    - Performance validation (<100ms)
    - Integration test with use command
-✅ All 22 tests passing (7 INI + 15 command tests)
+✅ All 16 command tests passing (see `tests/test_commands.sh`)
 ✅ Performance requirement met (<100ms - near-instant execution)
 ✅ Integration verified: whoami correctly shows profile after use command
 
@@ -353,6 +353,6 @@ No issues encountered during implementation. All tests passed on first run.
 ### File List
 
 - awsprof (modified) - Added `awsprof_cmd_whoami()` function and `whoami` case to main dispatch
-- tests/test_commands.sh (modified) - Added 5 new tests for whoami command (tests 11-15)
+- tests/test_commands.sh (modified) - Added tests for whoami command and stdout/stderr separation
 - _bmad-output/implementation-artifacts/1-4-show-current-profile.md (modified) - Updated status and completion notes
-- _bmad-output/implementation-artifacts/sprint-status.yaml (modified) - Updated story status to review
+- _bmad-output/implementation-artifacts/sprint-status.yaml (modified) - Updated story status to done

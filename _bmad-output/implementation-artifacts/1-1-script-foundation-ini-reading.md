@@ -1,6 +1,6 @@
 # Story 1.1: Script Foundation & INI Reading
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -251,8 +251,9 @@ No issues encountered during implementation.
 ✅ Implemented awk-based INI parsing functions (awsprof_ini_list_sections, awsprof_ini_read_section)
 ✅ Added file existence checking and error handling for missing/malformed files
 ✅ Created test fixtures with valid and malformed credential files
-✅ Implemented comprehensive test suite with 7 unit tests
-✅ All tests pass (7/7) - verified AC1, AC2, AC3
+✅ Implemented comprehensive test suite with 8 unit tests
+✅ All tests pass (8/8) - verified AC1, AC2, AC3
+✅ Code review fixes: added malformed INI detection + stderr errors, updated tests, added test runner
 
 **Technical Decisions:**
 - Used conditional `set -euo pipefail` to allow script sourcing for tests
@@ -262,7 +263,8 @@ No issues encountered during implementation.
 
 ### File List
 
-- awsprof (created) - Main executable script with INI parsing foundation
-- tests/test_ini.sh (created) - Unit test suite for INI functions
+- awsprof (modified) - INI parsing now validates malformed headers/lines
+- tests/test_ini.sh (modified) - Added malformed INI error assertions
+- tests/test_runner.sh (created) - Simple test harness
 - tests/fixtures/credentials.mock (created) - Valid multi-profile test data
 - tests/fixtures/credentials_malformed.mock (created) - Malformed INI test data

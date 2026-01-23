@@ -1,6 +1,6 @@
 # Story 1.3: Switch to Profile
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -322,7 +322,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 
 - Initial test failure: `$2` unbound variable error when calling `awsprof use` without parameter
 - Fix: Changed `"$2"` to `"${2:-}"` in main dispatch to handle missing parameter gracefully
-- Tests: All 17 tests passing (7 INI + 10 command tests)
+- Tests: `bash tests/test_commands.sh` (16/16)
 
 ### Completion Notes List
 
@@ -334,14 +334,15 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
    - stderr: User feedback messages
 ✅ Added `use` case to main dispatch with `"${2:-}"` parameter handling
 ✅ Updated help text to include `use` command with eval hint
-✅ Added 5 comprehensive tests to `tests/test_commands.sh`:
+✅ Added comprehensive tests to `tests/test_commands.sh`:
    - Valid profile switch with output verification
    - Non-existent profile rejection
    - Missing parameter handling
    - Eval integration (verifies AWS_PROFILE actually gets set)
    - Performance validation (<100ms)
+   - Stdout/stderr separation on success and error
 ✅ Fixed unbound variable issue in main dispatch
-✅ All tests pass (17/17)
+✅ All tests pass (16/16)
 ✅ Verified eval pattern works: `eval "$(awsprof use staging)"` correctly sets AWS_PROFILE
 
 **Technical Decisions:**
@@ -353,6 +354,6 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 ### File List
 
 - awsprof (modified) - Added `awsprof_cmd_use()` function and `use` case to main dispatch
-- tests/test_commands.sh (modified) - Added 5 new tests for use command (tests 6-10)
+- tests/test_commands.sh (modified) - Added/updated tests for use command and stdout/stderr separation
 - _bmad-output/implementation-artifacts/1-3-switch-to-profile.md (modified) - Updated status and completion notes
-- _bmad-output/implementation-artifacts/sprint-status.yaml (modified) - Updated story status to review
+- _bmad-output/implementation-artifacts/sprint-status.yaml (modified) - Updated story status to done

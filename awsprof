@@ -51,13 +51,29 @@ awsprof_ini_list_sections() {
     fi
 
     # Extract section names using awk
-    awk '/^\[/ {
-        gsub(/^\[|\]$/, "")
-        print
-    }' "$file" 2>/dev/null || {
-        awsprof_error "Failed to parse credentials file: $file"
+    local errexit_was_set=0
+    [[ $- == *e* ]] && errexit_was_set=1
+    set +e
+    awk '
+        /^\[/ {
+            if ($0 !~ /^\[[^][]+\]$/) {
+                print "Error: Malformed INI section header at line " NR ": " $0 > "/dev/stderr"
+                exit 2
+            }
+            gsub(/^\[|\]$/, "")
+            print
+        }
+    ' "$file"
+    local awk_status=$?
+    if [[ $errexit_was_set -eq 1 ]]; then
+        set -e
+    fi
+    if [[ $awk_status -ne 0 ]]; then
+        if [[ $awk_status -ne 2 ]]; then
+            awsprof_error "Failed to parse credentials file: $file"
+        fi
         return 1
-    }
+    fi
 
     return 0
 }
@@ -79,9 +95,22 @@ awsprof_ini_read_section() {
     fi
 
     # Read section content using awk
+    local errexit_was_set=0
+    [[ $- == *e* ]] && errexit_was_set=1
+    set +e
     awk -F' *= *' -v section="[$section]" '
-        $0 == section { found=1; next }
-        /^\[/ { found=0 }
+        /^\[/ {
+            if ($0 !~ /^\[[^][]+\]$/) {
+                print "Error: Malformed INI section header at line " NR ": " $0 > "/dev/stderr"
+                exit 2
+            }
+            found = ($0 == section)
+            next
+        }
+        found && $0 !~ /^[ \t]*($|[;#])/ && index($0, "=") == 0 {
+            print "Error: Malformed INI key/value at line " NR ": " $0 > "/dev/stderr"
+            exit 2
+        }
         found && /^[^#;]/ && NF >= 2 {
             key = $1
             gsub(/^[ \t]+|[ \t]+$/, "", key)
@@ -90,10 +119,17 @@ awsprof_ini_read_section() {
             gsub(/^[ \t]+|[ \t]+$/, "", val)
             print key "=" val
         }
-    ' "$file" 2>/dev/null || {
-        awsprof_error "Failed to read section '$section' from: $file"
+    ' "$file"
+    local awk_status=$?
+    if [[ $errexit_was_set -eq 1 ]]; then
+        set -e
+    fi
+    if [[ $awk_status -ne 0 ]]; then
+        if [[ $awk_status -ne 2 ]]; then
+            awsprof_error "Failed to read section '$section' from: $file"
+        fi
         return 1
-    }
+    fi
 
     return 0
 }
@@ -128,7 +164,7 @@ awsprof_cmd_use() {
 
     # Validate profile exists
     local profiles
-    profiles=$(awsprof_ini_list_sections 2>/dev/null) || return 1
+    profiles=$(awsprof_ini_list_sections) || return 1
 
     if ! echo "$profiles" | grep -qx "$profile_name"; then
         awsprof_error "Profile '$profile_name' not found"

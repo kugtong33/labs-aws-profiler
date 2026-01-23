@@ -26,16 +26,31 @@ echo
 
 # Test 1: list profiles from valid file
 ((TESTS_RUN++))
-stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" list 2>/dev/null) || exit_code=$?
+stderr_file=$(mktemp)
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" list 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
 exit_code=${exit_code:-0}
-if [[ $exit_code -eq 0 ]] && [[ "$stdout" == *"default"* ]] && [[ "$stdout" == *"staging"* ]] && [[ "$stdout" == *"production"* ]]; then
+if [[ $exit_code -eq 0 ]] && [[ -z "$stderr" ]] && [[ "$stdout" == *"default"* ]] && [[ "$stdout" == *"staging"* ]] && [[ "$stdout" == *"production"* ]]; then
     pass "awsprof list outputs profiles"
 else
     fail "awsprof list should output profiles"
 fi
 unset exit_code
+unset stderr
 
-# Test 2: missing credentials file
+# Test 2: list profiles from large file (100+ profiles)
+((TESTS_RUN++))
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials_many.mock" "${ROOT_DIR}/awsprof" list 2>/dev/null) || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == *"profile100"* ]] && [[ "$stdout" == *"profile120"* ]]; then
+    pass "awsprof list handles 100+ profiles"
+else
+    fail "awsprof list should handle 100+ profiles"
+fi
+unset exit_code
+
+# Test 3: missing credentials file
 ((TESTS_RUN++))
 stderr=$(AWS_SHARED_CREDENTIALS_FILE="/nonexistent/file.ini" "${ROOT_DIR}/awsprof" list 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
 if [[ $exit_code -eq 1 ]] && [[ "$stderr" == *"Credentials file not found"* ]]; then
@@ -45,7 +60,7 @@ else
 fi
 unset exit_code
 
-# Test 3: empty credentials file
+# Test 4: empty credentials file
 ((TESTS_RUN++))
 stderr=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials_empty.mock" "${ROOT_DIR}/awsprof" list 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
 if [[ $exit_code -eq 0 ]] && [[ "$stderr" == *"No profiles found"* ]]; then
@@ -55,7 +70,7 @@ else
 fi
 unset exit_code
 
-# Test 4: exit codes are correct for success
+# Test 5: exit codes are correct for success
 ((TESTS_RUN++))
 AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" list >/dev/null 2>&1
 exit_code=$?
@@ -66,10 +81,10 @@ else
 fi
 unset exit_code
 
-# Test 5: end-to-end + basic performance check (<100ms)
+# Test 6: end-to-end + basic performance check (<100ms)
 ((TESTS_RUN++))
 start_ns=$(date +%s%N)
-AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" list >/dev/null 2>&1
+AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials_many.mock" "${ROOT_DIR}/awsprof" list >/dev/null 2>&1
 exit_code=$?
 end_ns=$(date +%s%N)
 elapsed_ns=$((end_ns - start_ns))
@@ -80,37 +95,55 @@ else
 fi
 unset exit_code
 
-# Test 6: use valid profile
+# Test 7: use valid profile
 ((TESTS_RUN++))
-result=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" use default 2>&1) && exit_code=0 || exit_code=$?
-if [[ $exit_code -eq 0 ]] && [[ "$result" == *"export AWS_PROFILE=default"* ]] && [[ "$result" == *"Switched to profile: default"* ]]; then
+stderr_file=$(mktemp)
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" use default 2>"$stderr_file") && exit_code=0 || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+stdout=${stdout:-}
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "export AWS_PROFILE=default" ]] && [[ "$stderr" == *"Switched to profile: default"* ]]; then
     pass "awsprof use switches to valid profile"
 else
-    fail "awsprof use should switch to valid profile (got: $result)"
+    fail "awsprof use should switch to valid profile"
 fi
 unset exit_code
+unset stdout
+unset stderr
 
-# Test 7: use non-existent profile
+# Test 8: use non-existent profile
 ((TESTS_RUN++))
-result=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" use nonexistent 2>&1) && exit_code=0 || exit_code=$?
-if [[ $exit_code -eq 1 ]] && [[ "$result" == *"not found"* ]] && [[ "$result" != *"export"* ]]; then
+stderr_file=$(mktemp)
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" use nonexistent 2>"$stderr_file") && exit_code=0 || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+stdout=${stdout:-}
+if [[ $exit_code -eq 1 ]] && [[ -z "$stdout" ]] && [[ "$stderr" == *"not found"* ]]; then
     pass "awsprof use rejects non-existent profile"
 else
     fail "awsprof use should reject non-existent profile"
 fi
 unset exit_code
+unset stdout
+unset stderr
 
-# Test 8: use missing parameter
+# Test 9: use missing parameter
 ((TESTS_RUN++))
-result=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" use 2>&1) && exit_code=0 || exit_code=$?
-if [[ $exit_code -eq 1 ]] && [[ "$result" == *"required"* ]]; then
+stderr_file=$(mktemp)
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" use 2>"$stderr_file") && exit_code=0 || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+stdout=${stdout:-}
+if [[ $exit_code -eq 1 ]] && [[ -z "$stdout" ]] && [[ "$stderr" == *"required"* ]] && [[ "$stderr" != *"unbound variable"* ]]; then
     pass "awsprof use requires profile name"
 else
     fail "awsprof use should require profile name"
 fi
 unset exit_code
+unset stdout
+unset stderr
 
-# Test 9: eval integration
+# Test 10: eval integration
 ((TESTS_RUN++))
 (
     export AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock"
@@ -124,7 +157,7 @@ else
 fi
 unset exit_code
 
-# Test 10: use command performance (<100ms)
+# Test 11: use command performance (<100ms)
 ((TESTS_RUN++))
 start_ns=$(date +%s%N)
 AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" use default >/dev/null 2>&1
@@ -138,37 +171,55 @@ else
 fi
 unset exit_code
 
-# Test 11: whoami with AWS_PROFILE set
+# Test 12: whoami with AWS_PROFILE set
 ((TESTS_RUN++))
-result=$(AWS_PROFILE="staging" "${ROOT_DIR}/awsprof" whoami 2>&1) && exit_code=0 || exit_code=$?
-if [[ $exit_code -eq 0 ]] && [[ "$result" == "staging" ]]; then
+stderr_file=$(mktemp)
+stdout=$(AWS_PROFILE="staging" "${ROOT_DIR}/awsprof" whoami 2>"$stderr_file") && exit_code=0 || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+stdout=${stdout:-}
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "staging" ]] && [[ -z "$stderr" ]]; then
     pass "awsprof whoami displays current profile"
 else
-    fail "awsprof whoami should display current profile (got: $result)"
+    fail "awsprof whoami should display current profile"
 fi
 unset exit_code
+unset stdout
+unset stderr
 
-# Test 12: whoami without AWS_PROFILE set
+# Test 13: whoami without AWS_PROFILE set
 ((TESTS_RUN++))
-result=$(unset AWS_PROFILE; "${ROOT_DIR}/awsprof" whoami 2>&1) && exit_code=0 || exit_code=$?
-if [[ $exit_code -eq 0 ]] && [[ "$result" == *"No profile set"* ]]; then
+stderr_file=$(mktemp)
+stdout=$(unset AWS_PROFILE; "${ROOT_DIR}/awsprof" whoami 2>"$stderr_file") && exit_code=0 || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+stdout=${stdout:-}
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == *"No profile set"* ]] && [[ -z "$stderr" ]]; then
     pass "awsprof whoami displays default message when no profile set"
 else
-    fail "awsprof whoami should display default message (got: $result)"
+    fail "awsprof whoami should display default message"
 fi
 unset exit_code
+unset stdout
+unset stderr
 
-# Test 13: whoami with empty AWS_PROFILE
+# Test 14: whoami with empty AWS_PROFILE
 ((TESTS_RUN++))
-result=$(AWS_PROFILE="" "${ROOT_DIR}/awsprof" whoami 2>&1) && exit_code=0 || exit_code=$?
-if [[ $exit_code -eq 0 ]] && [[ "$result" == *"No profile set"* ]]; then
+stderr_file=$(mktemp)
+stdout=$(AWS_PROFILE="" "${ROOT_DIR}/awsprof" whoami 2>"$stderr_file") && exit_code=0 || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+stdout=${stdout:-}
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == *"No profile set"* ]] && [[ -z "$stderr" ]]; then
     pass "awsprof whoami handles empty AWS_PROFILE"
 else
-    fail "awsprof whoami should handle empty AWS_PROFILE (got: $result)"
+    fail "awsprof whoami should handle empty AWS_PROFILE"
 fi
 unset exit_code
+unset stdout
+unset stderr
 
-# Test 14: whoami performance (<100ms)
+# Test 15: whoami performance (<100ms)
 ((TESTS_RUN++))
 start_ns=$(date +%s%N)
 AWS_PROFILE="test" "${ROOT_DIR}/awsprof" whoami >/dev/null 2>&1
@@ -182,7 +233,7 @@ else
 fi
 unset exit_code
 
-# Test 15: integration - whoami after use
+# Test 16: integration - whoami after use
 ((TESTS_RUN++))
 (
     export AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock"
