@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+#
+# awsprof - AWS Profile Manager
+# https://github.com/ubuntu/labs-aws-profiler
+#
+
+# Only set strict mode when running as script, not when sourced
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    set -euo pipefail
+fi
+
+#=== CONFIGURATION ===
+_awsprof_version="1.0.0"
+_awsprof_credentials="${AWS_SHARED_CREDENTIALS_FILE:-$HOME/.aws/credentials}"
+_awsprof_config="${AWS_CONFIG_FILE:-$HOME/.aws/config}"
+AWSPROF_EMOJI="${AWSPROF_EMOJI:-0}"
+
+#=== OUTPUT UTILITIES ===
+# awsprof_msg - Output message to stderr
+# awsprof_error - Output error message to stderr
+# awsprof_warn - Output warning message to stderr
+# awsprof_success - Output success message to stderr
+
+awsprof_msg() {
+    echo "$*" >&2
+}
+
+awsprof_error() {
+    awsprof_msg "Error: $*"
+}
+
+awsprof_warn() {
+    awsprof_msg "Warning: $*"
+}
+
+awsprof_success() {
+    awsprof_msg "$*"
+}
+
+#=== INI HANDLING ===
+# awsprof_ini_list_sections - List all profile sections from credentials file
+# awsprof_ini_read_section - Read key-value pairs from a specific section
+
+awsprof_ini_list_sections() {
+    local file="${1:-$_awsprof_credentials}"
+
+    # Check if file exists
+    if [[ ! -f "$file" ]]; then
+        awsprof_error "Credentials file not found: $file"
+        return 1
+    fi
+
+    # Extract section names using awk
+    awk '/^\[/ {
+        gsub(/^\[|\]$/, "")
+        print
+    }' "$file" 2>/dev/null || {
+        awsprof_error "Failed to parse credentials file: $file"
+        return 1
+    }
+
+    return 0
+}
+
+awsprof_ini_read_section() {
+    local section="$1"
+    local file="${2:-$_awsprof_credentials}"
+
+    # Check if file exists
+    if [[ ! -f "$file" ]]; then
+        awsprof_error "Credentials file not found: $file"
+        return 1
+    fi
+
+    # Check if section parameter provided
+    if [[ -z "$section" ]]; then
+        awsprof_error "Section name required"
+        return 1
+    fi
+
+    # Read section content using awk
+    awk -F' *= *' -v section="[$section]" '
+        $0 == section { found=1; next }
+        /^\[/ { found=0 }
+        found && /^[^#;]/ && NF >= 2 {
+            key = $1
+            gsub(/^[ \t]+|[ \t]+$/, "", key)
+            val = $2
+            for (i = 3; i <= NF; i++) val = val "=" $i
+            gsub(/^[ \t]+|[ \t]+$/, "", val)
+            print key "=" val
+        }
+    ' "$file" 2>/dev/null || {
+        awsprof_error "Failed to read section '$section' from: $file"
+        return 1
+    }
+
+    return 0
+}
+
+#=== MAIN DISPATCH ===
+# Main command dispatcher (to be implemented in future stories)
+
+# If script is sourced (for testing), don't run main
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Main execution will be added in future stories
+    echo "awsprof v${_awsprof_version}" >&2
+fi
