@@ -138,6 +138,65 @@ else
 fi
 unset exit_code
 
+# Test 11: whoami with AWS_PROFILE set
+((TESTS_RUN++))
+result=$(AWS_PROFILE="staging" "${ROOT_DIR}/awsprof" whoami 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 0 ]] && [[ "$result" == "staging" ]]; then
+    pass "awsprof whoami displays current profile"
+else
+    fail "awsprof whoami should display current profile (got: $result)"
+fi
+unset exit_code
+
+# Test 12: whoami without AWS_PROFILE set
+((TESTS_RUN++))
+result=$(unset AWS_PROFILE; "${ROOT_DIR}/awsprof" whoami 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 0 ]] && [[ "$result" == *"No profile set"* ]]; then
+    pass "awsprof whoami displays default message when no profile set"
+else
+    fail "awsprof whoami should display default message (got: $result)"
+fi
+unset exit_code
+
+# Test 13: whoami with empty AWS_PROFILE
+((TESTS_RUN++))
+result=$(AWS_PROFILE="" "${ROOT_DIR}/awsprof" whoami 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 0 ]] && [[ "$result" == *"No profile set"* ]]; then
+    pass "awsprof whoami handles empty AWS_PROFILE"
+else
+    fail "awsprof whoami should handle empty AWS_PROFILE (got: $result)"
+fi
+unset exit_code
+
+# Test 14: whoami performance (<100ms)
+((TESTS_RUN++))
+start_ns=$(date +%s%N)
+AWS_PROFILE="test" "${ROOT_DIR}/awsprof" whoami >/dev/null 2>&1
+exit_code=$?
+end_ns=$(date +%s%N)
+elapsed_ns=$((end_ns - start_ns))
+if [[ $exit_code -eq 0 ]] && [[ $elapsed_ns -lt 100000000 ]]; then
+    pass "awsprof whoami completes within 100ms"
+else
+    fail "awsprof whoami should complete within 100ms"
+fi
+unset exit_code
+
+# Test 15: integration - whoami after use
+((TESTS_RUN++))
+(
+    export AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock"
+    eval "$("${ROOT_DIR}/awsprof" use default 2>/dev/null)"
+    result=$("${ROOT_DIR}/awsprof" whoami)
+    [[ "$result" == "default" ]] && exit 0 || exit 1
+) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 0 ]]; then
+    pass "awsprof whoami shows profile after use command"
+else
+    fail "awsprof whoami should show profile after use command"
+fi
+unset exit_code
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"
