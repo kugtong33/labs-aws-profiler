@@ -80,6 +80,64 @@ else
 fi
 unset exit_code
 
+# Test 6: use valid profile
+((TESTS_RUN++))
+result=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" use default 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 0 ]] && [[ "$result" == *"export AWS_PROFILE=default"* ]] && [[ "$result" == *"Switched to profile: default"* ]]; then
+    pass "awsprof use switches to valid profile"
+else
+    fail "awsprof use should switch to valid profile (got: $result)"
+fi
+unset exit_code
+
+# Test 7: use non-existent profile
+((TESTS_RUN++))
+result=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" use nonexistent 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"not found"* ]] && [[ "$result" != *"export"* ]]; then
+    pass "awsprof use rejects non-existent profile"
+else
+    fail "awsprof use should reject non-existent profile"
+fi
+unset exit_code
+
+# Test 8: use missing parameter
+((TESTS_RUN++))
+result=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" use 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"required"* ]]; then
+    pass "awsprof use requires profile name"
+else
+    fail "awsprof use should require profile name"
+fi
+unset exit_code
+
+# Test 9: eval integration
+((TESTS_RUN++))
+(
+    export AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock"
+    eval "$("${ROOT_DIR}/awsprof" use default 2>/dev/null)"
+    [[ "$AWS_PROFILE" == "default" ]] && exit 0 || exit 1
+) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 0 ]]; then
+    pass "awsprof use works with eval pattern"
+else
+    fail "awsprof use should work with eval pattern"
+fi
+unset exit_code
+
+# Test 10: use command performance (<100ms)
+((TESTS_RUN++))
+start_ns=$(date +%s%N)
+AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" use default >/dev/null 2>&1
+exit_code=$?
+end_ns=$(date +%s%N)
+elapsed_ns=$((end_ns - start_ns))
+if [[ $exit_code -eq 0 ]] && [[ $elapsed_ns -lt 100000000 ]]; then
+    pass "awsprof use completes within 100ms"
+else
+    fail "awsprof use should complete within 100ms"
+fi
+unset exit_code
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"

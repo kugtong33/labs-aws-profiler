@@ -100,6 +100,7 @@ awsprof_ini_read_section() {
 
 #=== PROFILE COMMANDS ===
 # awsprof_cmd_list - List available profiles
+# awsprof_cmd_use - Switch to a profile
 
 awsprof_cmd_list() {
     local profiles
@@ -114,6 +115,34 @@ awsprof_cmd_list() {
     return 0
 }
 
+awsprof_cmd_use() {
+    local profile_name="$1"
+
+    # Validate parameter provided
+    if [[ -z "$profile_name" ]]; then
+        awsprof_error "Profile name required"
+        awsprof_msg "Usage: awsprof use <profile-name>"
+        return 1
+    fi
+
+    # Validate profile exists
+    local profiles
+    profiles=$(awsprof_ini_list_sections 2>/dev/null) || return 1
+
+    if ! echo "$profiles" | grep -qx "$profile_name"; then
+        awsprof_error "Profile '$profile_name' not found"
+        return 1
+    fi
+
+    # Output eval code to stdout
+    echo "export AWS_PROFILE=$profile_name"
+
+    # Output success message to stderr
+    awsprof_success "Switched to profile: $profile_name"
+
+    return 0
+}
+
 #=== MAIN DISPATCH ===
 # Main command dispatcher
 
@@ -124,12 +153,17 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             awsprof_cmd_list
             exit $?
             ;;
+        use)
+            awsprof_cmd_use "${2:-}"
+            exit $?
+            ;;
         help|--help|-h|"")
             awsprof_msg "awsprof v${_awsprof_version}"
             awsprof_msg "Usage: awsprof <command>"
             awsprof_msg ""
             awsprof_msg "Commands:"
-            awsprof_msg "  list    List available AWS profiles"
+            awsprof_msg "  list              List available AWS profiles"
+            awsprof_msg "  use <profile>     Switch to a profile (use with eval)"
             exit 0
             ;;
         *)
