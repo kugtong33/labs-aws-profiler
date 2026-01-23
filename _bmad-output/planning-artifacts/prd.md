@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [step-01-init, step-02-discovery, step-03-success, step-04-journeys, step-05-domain, step-06-innovation, step-07-project-type]
+stepsCompleted: [step-01-init, step-02-discovery, step-03-success, step-04-journeys, step-05-domain, step-06-innovation, step-07-project-type, step-08-scoping, step-09-functional, step-10-nonfunctional, step-11-polish]
 inputDocuments:
   - product-brief-labs-aws-profiler-2026-01-22.md
 documentCounts:
@@ -21,6 +21,21 @@ author: Ubuntu
 
 **Author:** Ubuntu
 **Date:** 2026-01-22
+
+## Executive Summary
+
+**labs-aws-profiler** is a CLI tool for managing and switching between AWS profiles. It solves the pain of manually editing `~/.aws/credentials`, forgetting which account is active, and accidentally running commands against the wrong AWS account.
+
+**Core Value:** Fast profile switching with project-aware safety warnings.
+
+**Target User:** Infrastructure developers managing multiple AWS accounts (personal, work, client).
+
+**Key Capabilities:**
+- Profile CRUD (add, edit, remove, list, import)
+- Instant switching via `AWS_PROFILE` environment variable
+- Project-profile linking with mismatch warnings
+
+**Technical Context:** Linux CLI tool, bash/sh compatible, uses standard AWS credential files.
 
 ## Success Criteria
 
@@ -247,3 +262,163 @@ labs-aws-profiler is a command-line interface tool designed for terminal-native 
 - Shell completion for profile names
 - JSON output format option (`--json` flag)
 - Global configuration file if needed
+
+## Project Scoping & Phased Development
+
+### MVP Strategy & Philosophy
+
+**MVP Approach:** Problem-Solving MVP
+- Minimum feature set that eliminates the core pain point
+- Focus on reliability over features
+- Ship when it works, not when it's complete
+
+**Resource Requirements:** Solo developer project
+- Single developer can build and maintain
+- No external dependencies beyond standard libraries
+- No infrastructure required (local CLI tool)
+
+### MVP Feature Set (Phase 1)
+
+**Core User Journeys Supported:**
+- First-Time Setup (import existing profiles)
+- Daily Workflow (profile switching)
+- Project Context Switch (mismatch warnings)
+- Profile Management (add new profiles)
+
+**Must-Have Capabilities:**
+
+| Capability | Rationale |
+|------------|-----------|
+| `awsprof add` | Create new profiles |
+| `awsprof edit` | Modify existing credentials |
+| `awsprof remove` | Clean up unused profiles |
+| `awsprof list` | See all available profiles |
+| `awsprof import` | Onboard existing AWS users |
+| `awsprof use` | Core switching functionality |
+| `awsprof whoami` | Visibility into current state |
+| `.awsprofile` detection | Project-profile linking |
+| Mismatch warning | Safety net (non-intrusive) |
+
+**Shell Integration Philosophy:**
+- Warn on mismatch, don't block
+- Prompt to switch, don't auto-switch
+- Silent when profile matches (no noise)
+- User remains in control at all times
+
+### Post-MVP Features
+
+**Phase 2 (v2):**
+- Shell completion for profile names
+- JSON output format (`--json` flag)
+- Global configuration file (if usage patterns reveal need)
+
+**Phase 3 (Future):**
+- Driven by actual usage needs
+- No speculative roadmap
+
+### Risk Mitigation Strategy
+
+**Technical Risks:** Low
+- AWS credential file format is stable and well-documented
+- Shell integration patterns are established (similar to nvm, rbenv)
+- No external API dependencies
+
+**Market Risks:** N/A
+- Personal utility, no market validation needed
+- Success = works for the author
+
+**Resource Risks:** Minimal
+- Solo project with clear scope
+- Can ship incrementally (commands can be added one at a time)
+- No deadline pressure
+
+## Functional Requirements
+
+### Profile Management
+
+- FR1: User can add a new AWS profile by providing a name, access key ID, and secret access key
+- FR2: User can edit an existing profile's credentials (access key ID and secret access key)
+- FR3: User can remove an existing profile from the system
+- FR4: User can view a list of all configured AWS profiles
+- FR5: System stores profile credentials in standard `~/.aws/credentials` format
+- FR6: System preserves existing profiles when adding or editing (no data loss)
+
+### Profile Import
+
+- FR7: User can import all existing profiles from `~/.aws/credentials` file
+- FR8: System detects and lists all profiles found during import
+- FR9: System preserves original credential file structure during import
+
+### Profile Switching
+
+- FR10: User can switch to any configured profile by name
+- FR11: System sets `AWS_PROFILE` environment variable when switching profiles
+- FR12: System confirms successful profile switch with feedback message
+- FR13: System reports error when user attempts to switch to non-existent profile
+
+### Current Profile Status
+
+- FR14: User can query the currently active profile
+- FR15: System displays the current `AWS_PROFILE` value (or indicates none set)
+
+### Project-Profile Linking
+
+- FR16: User can create a `.awsprofile` file in a project directory containing a profile name
+- FR17: System detects `.awsprofile` file when user enters a directory
+- FR18: System compares current profile against project's expected profile
+- FR19: System displays warning when current profile differs from project's expected profile
+- FR20: System prompts user to switch profiles when mismatch is detected
+- FR21: User can accept or decline the profile switch prompt
+- FR22: System remains silent when current profile matches project expectation
+
+### Shell Integration
+
+- FR23: System provides shell initialization script for bash
+- FR24: System provides shell initialization script for sh
+- FR25: Shell integration enables automatic `.awsprofile` detection on directory change
+- FR26: System outputs commands suitable for shell eval (enabling env var export)
+
+### Error Handling
+
+- FR27: System exits with status code 0 on successful operations
+- FR28: System exits with non-zero status code on failures
+- FR29: System displays clear error messages for invalid operations
+- FR30: System validates profile name exists before switching
+- FR31: System validates credential format before saving
+
+### Credential Security
+
+- FR32: System prompts for credentials with hidden input (no terminal echo)
+- FR33: System never displays secret access keys in output
+- FR34: System writes credentials directly to file (no intermediate storage)
+
+## Non-Functional Requirements
+
+### Performance
+
+- NFR1: All commands complete within 100ms under normal operation
+- NFR2: Profile listing displays immediately regardless of number of profiles (up to 100+)
+- NFR3: Shell hook detection adds no perceptible delay to directory changes
+- NFR4: Credential file read/write operations complete atomically
+
+### Security
+
+- NFR5: Credential input is hidden (no terminal echo during password/secret entry)
+- NFR6: Secret access keys are never displayed in command output
+- NFR7: Secret access keys are never written to log files or command history
+- NFR8: Credential files maintain standard AWS permission model (user-only read/write)
+- NFR9: No credentials transmitted over network (local file operations only)
+
+### Reliability
+
+- NFR10: Credential file operations are atomic (no partial writes on failure)
+- NFR11: System creates backup before modifying existing credential files
+- NFR12: System gracefully handles malformed credential files without data loss
+- NFR13: Shell integration failures do not break normal shell operation
+
+### Integration
+
+- NFR14: Full compatibility with AWS CLI credential file format (INI)
+- NFR15: Full compatibility with AWS CLI config file format
+- NFR16: Profile switching works with all tools that respect `AWS_PROFILE` env var
+- NFR17: Shell integration works with bash 4.0+ and POSIX sh
