@@ -98,11 +98,43 @@ awsprof_ini_read_section() {
     return 0
 }
 
+#=== PROFILE COMMANDS ===
+# awsprof_cmd_list - List available profiles
+
+awsprof_cmd_list() {
+    local profiles
+    profiles=$(awsprof_ini_list_sections) || return 1
+
+    if [[ -z "$profiles" ]]; then
+        awsprof_msg "No profiles found"
+        return 0
+    fi
+
+    echo "$profiles"
+    return 0
+}
+
 #=== MAIN DISPATCH ===
-# Main command dispatcher (to be implemented in future stories)
+# Main command dispatcher
 
 # If script is sourced (for testing), don't run main
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    # Main execution will be added in future stories
-    echo "awsprof v${_awsprof_version}" >&2
+    case "${1:-}" in
+        list)
+            awsprof_cmd_list
+            exit $?
+            ;;
+        help|--help|-h|"")
+            awsprof_msg "awsprof v${_awsprof_version}"
+            awsprof_msg "Usage: awsprof <command>"
+            awsprof_msg ""
+            awsprof_msg "Commands:"
+            awsprof_msg "  list    List available AWS profiles"
+            exit 0
+            ;;
+        *)
+            awsprof_error "Unknown command: ${1}"
+            exit 1
+            ;;
+    esac
 fi
