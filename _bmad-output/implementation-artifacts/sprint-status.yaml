@@ -52,7 +52,7 @@ development_status:
   2-2-add-new-profile: review
   2-3-edit-existing-profile: done
   2-4-remove-profile: review
-  2-5-import-existing-profiles: backlog
+  2-5-import-existing-profiles: ready-for-dev
   epic-2-retrospective: optional
 
   epic-3: backlog
