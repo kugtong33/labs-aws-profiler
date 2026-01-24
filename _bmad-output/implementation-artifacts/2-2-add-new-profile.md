@@ -1,6 +1,6 @@
 # Story 2.2: Add New Profile
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -396,7 +396,8 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - Prompts for AWS Access Key ID (visible input)
 - Prompts for AWS Secret Access Key (hidden input with `read -s`)
 - Validates credentials are non-empty
-- Provides warning for non-standard access key format
+- Rejects invalid Access Key ID format with clear error
+- Rejects invalid Secret Access Key format with clear error
 - Uses `awsprof_ini_write_section()` from Story 2.1 for safe file writing
 - Displays success message to stderr
 - Returns proper exit codes (0=success, 1=error)
@@ -406,7 +407,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - Passes profile name parameter from `${2:-}`
 - Updated help text to include `add <profile>` command
 
-✅ Comprehensive test suite added (10 new tests, all passing)
+✅ Comprehensive test suite added (12 new tests, all passing)
 - Test 17: Add new profile successfully
 - Test 18: Duplicate profile rejection
 - Test 19: Missing profile name parameter
@@ -417,10 +418,12 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - Test 24: Secret never displayed in output
 - Test 25: Integration - add then list
 - Test 26: Integration - add then use
+- Test 27: Reject invalid access key format
+- Test 28: Reject invalid secret key format
 
-✅ All tests passing (43 total):
-- 17 INI tests (Story 2.1)
-- 26 command tests (16 from Epic 1 + 10 new)
+✅ All tests passing (82 total):
+- 24 INI tests (Story 2.1)
+- 58 command tests (16 from Epic 1 + 12 new + later stories)
 - No regressions
 - 100% test coverage
 
@@ -429,7 +432,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - Follows established `awsprof_cmd_<command>` naming pattern
 - Uses Story 2.1's `awsprof_ini_write_section()` - no need to implement backup/chmod manually
 - Hidden input pattern: `read -s -p "AWS Secret Access Key: " secret_access_key`
-- Echo after hidden input for proper terminal formatting
+- Newline after hidden input written to stderr to keep stdout clean
 - Duplicate check uses existing `awsprof_ini_list_sections()` function
 - All user messages via stderr (awsprof_msg, awsprof_error, awsprof_success)
 
@@ -441,6 +444,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - ✅ chmod 600 enforced (via `awsprof_ini_write_section`)
 - ✅ Duplicate profile check prevents overwrites
 - ✅ Empty credential validation
+- ✅ Credential format validation (Access Key ID + Secret Access Key)
 - ✅ Exit codes correct (0=success, 1=error)
 
 **User Experience:**

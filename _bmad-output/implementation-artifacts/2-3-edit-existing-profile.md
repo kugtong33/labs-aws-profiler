@@ -47,32 +47,33 @@ So that I can rotate keys without losing the profile configuration.
 
 ## Tasks / Subtasks
 
-- [ ] Implement `awsprof_cmd_edit()` command function (AC: #1, #2, #3, #4)
-  - [ ] Validate profile name parameter provided
-  - [ ] Check if profile exists (reject non-existent)
-  - [ ] Prompt for new AWS Access Key ID
-  - [ ] Prompt for new AWS Secret Access Key with hidden input (`read -s`)
-  - [ ] Validate credential format (non-empty, basic format check)
-  - [ ] Call `awsprof_ini_write_section()` to update profile
-  - [ ] Display success message to stderr
-  - [ ] Return appropriate exit codes
+- [x] Implement `awsprof_cmd_edit()` command function (AC: #1, #2, #3, #4)
+  - [x] Validate profile name parameter provided
+  - [x] Check if profile exists (reject non-existent)
+  - [x] Prompt for new AWS Access Key ID
+  - [x] Prompt for new AWS Secret Access Key with hidden input (`read -s`)
+  - [x] Validate credential format (non-empty, strict format check)
+  - [x] Call `awsprof_ini_write_section()` to update profile
+  - [x] Display success message to stderr
+  - [x] Return appropriate exit codes
 
-- [ ] Add `edit` command to main dispatch (AC: #1)
-  - [ ] Add case statement entry for `edit`
-  - [ ] Call `awsprof_cmd_edit` with profile name parameter
-  - [ ] Update help text to include `edit` command
+- [x] Add `edit` command to main dispatch (AC: #1)
+  - [x] Add case statement entry for `edit`
+  - [x] Call `awsprof_cmd_edit` with profile name parameter
+  - [x] Update help text to include `edit` command
 
-- [ ] Write comprehensive tests (AC: #1, #2, #3, #4)
-  - [ ] Test edit existing profile successfully
-  - [ ] Test non-existent profile rejection
-  - [ ] Test missing profile name parameter
-  - [ ] Test credential validation (empty values)
-  - [ ] Test other profiles preserved
-  - [ ] Test backup created before write
-  - [ ] Test chmod 600 on credentials file
-  - [ ] Test secret key never displayed in output
-  - [ ] Test integration: edit profile, then use to verify
-  - [ ] Test integration: edit profile, then list to verify still exists
+- [x] Write comprehensive tests (AC: #1, #2, #3, #4)
+  - [x] Test edit existing profile successfully
+  - [x] Test non-existent profile rejection
+  - [x] Test missing profile name parameter
+  - [x] Test credential validation (empty values)
+  - [x] Test invalid credential formats
+  - [x] Test other profiles preserved
+  - [x] Test backup created before write
+  - [x] Test chmod 600 on credentials file
+  - [x] Test secret key never displayed in output
+  - [x] Test integration: edit profile, then use to verify
+  - [x] Test integration: edit profile, then list to verify still exists
 
 ## Dev Notes
 
@@ -355,15 +356,16 @@ labs-aws-profiler/
 ### Security and Safety Checklist
 
 **CRITICAL - MUST BE VERIFIED:**
-- [ ] Secret key input uses `read -s` (hidden)
-- [ ] Secret key never echoed to terminal
-- [ ] Secret key never appears in error messages
-- [ ] Backup created before write (via `awsprof_ini_write_section`)
-- [ ] chmod 600 enforced (via `awsprof_ini_write_section`)
-- [ ] Non-existent profile check prevents errors
-- [ ] Empty credential validation
-- [ ] Exit codes correct (0=success, 1=error)
-- [ ] Original profile unchanged on validation failure
+- [x] Secret key input uses `read -s` (hidden)
+- [x] Secret key never echoed to terminal
+- [x] Secret key never appears in error messages
+- [x] Backup created before write (via `awsprof_ini_write_section`)
+- [x] chmod 600 enforced (via `awsprof_ini_write_section`)
+- [x] Non-existent profile check prevents errors
+- [x] Empty credential validation
+- [x] Credential format validation (Access Key ID + Secret Access Key)
+- [x] Exit codes correct (0=success, 1=error)
+- [x] Original profile unchanged on validation failure
 
 ### Learnings from Story 2.2
 
@@ -371,7 +373,7 @@ labs-aws-profiler/
 - ✅ Pattern works well - interactive prompting is user-friendly
 - ✅ `awsprof_ini_write_section()` handles both add and update seamlessly
 - ✅ Hidden input with `read -s` is secure and tested
-- ✅ Validation pattern (empty check + format warning) is comprehensive
+- ✅ Strict format validation for Access Key ID and Secret Access Key
 - ✅ Test pattern is established and easy to adapt
 
 **Code Reuse:**
@@ -379,11 +381,6 @@ Story 2.3 can reuse 95% of Story 2.2's code! Only changes:
 1. Existence check (does exist vs doesn't exist)
 2. Error messages ("not found" vs "already exists")
 3. Success message ("updated" vs "added")
-
-**Estimated Implementation Time:**
-- ~20 minutes (vs 40 minutes for Story 2.2)
-- Most time will be copy-paste-adapt from Story 2.2
-- Tests follow same pattern
 
 ### References
 
@@ -401,8 +398,8 @@ Claude Haiku 4.5 (claude-haiku-4-5-20251001)
 
 ### Debug Log References
 
-All tests passed on first run (36/36 tests pass)
-- Git commit: d6eabb2 - feat: implement Story 2.3 - Edit Existing Profile
+- Tests: `bash tests/test_commands.sh`
+- All tests: `bash tests/test_runner.sh`
 
 ### Completion Notes List
 
@@ -414,14 +411,15 @@ All tests passed on first run (36/36 tests pass)
 ✅ **Key Design Decisions:**
 - Used identical structure to Story 2.2 (add command), only reversed profile existence check
 - Hidden input for secret keys using `read -s` for security
-- Validation pattern follows existing conventions (empty check + format warning)
+- Strict format validation for Access Key ID and Secret Access Key (rejects invalid formats)
+- Newline after hidden input written to stderr to keep stdout clean
 - Success message clearly indicates "updated" vs "added"
 
 ✅ **Testing:**
-- Replicated test pattern from Story 2.2 with 10 new tests
-- All tests adapt seamlessly: Test 27-36 (edit command tests)
-- Covers: success, rejection, empty validation, preservation, chmod, secret hiding, integration
-- All 36 tests pass (26 existing + 10 new)
+- Replicated test pattern from Story 2.2 with 12 new tests
+- Covers: success, rejection, empty validation, strict format validation, preservation, chmod, secret hiding, integration
+- Edit tests by number: 29-40 (includes format validation in Tests 39-40)
+- All command tests pass (60 total)
 
 ✅ **Security & Safety Verified:**
 - ✓ Secret key input uses `read -s` (hidden from terminal)
@@ -430,6 +428,7 @@ All tests passed on first run (36/36 tests pass)
 - ✓ chmod 600 enforced (via `awsprof_ini_write_section`)
 - ✓ Non-existent profile check prevents errors
 - ✓ Empty credential validation works correctly
+- ✓ Credential format validation rejects invalid Access Key ID and Secret Access Key
 - ✓ Exit codes correct (0=success, 1=error)
 - ✓ Original profile unchanged on validation failure
 
@@ -443,5 +442,5 @@ Story 2.3 reused 95% of Story 2.2 code as predicted in dev notes
 ### File List
 
 - `awsprof` - Main script (added edit command, 55 new lines in function + dispatch)
-- `tests/test_commands.sh` - Test suite (added 10 new tests, 360 new lines)
+- `tests/test_commands.sh` - Test suite (added 12 new tests for edit command)
 - `_bmad-output/implementation-artifacts/2-3-edit-existing-profile.md` - This story file (status: done)

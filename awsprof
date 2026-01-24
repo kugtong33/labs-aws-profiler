@@ -168,64 +168,70 @@ awsprof_ini_write_section() {
     local kvpairs=("$@")
 
     local file="${AWS_SHARED_CREDENTIALS_FILE:-$_awsprof_credentials}"
-    local temp_file=$(mktemp)
 
     # Check if section parameter provided
     if [[ -z "$section" ]]; then
         awsprof_error "Section name required"
-        rm -f "$temp_file"
         return 1
     fi
 
-    # Create backup if file exists
-    if [[ -f "$file" ]]; then
-        awsprof_backup_credentials "$file" || {
-            rm -f "$temp_file"
-            return 1
-        }
+    local dir
+    dir=$(dirname "$file")
+    local temp_file
+    temp_file=$(mktemp -p "$dir" ".awsprof.XXXXXX") || {
+        awsprof_error "Failed to create temp file in: $dir"
+        return 1
+    }
+
+    local crlf=0
+    if [[ -f "$file" ]] && LC_ALL=C grep -q $'\r' "$file"; then
+        crlf=1
     fi
 
     # Build awk script for section write
     local awk_script='
     BEGIN {
         section_header = "[" section "]"
-        found = 0
         in_target = 0
+        found = 0
+        wrote = 0
         split(kvpairs, pairs, "\n")
     }
     /^\[/ {
         # If we were in target section, output new key-value pairs
-        if (in_target && found == 1) {
+        if (in_target && wrote == 0) {
             for (i in pairs) {
                 if (pairs[i] != "") print pairs[i]
             }
-            found = 2  # Mark as already written
+            wrote = 1
         }
         # Check if this is our target section
         in_target = ($0 == section_header)
-        if (!in_target) print
-        if (in_target) print
+        if (in_target) {
+            found = 1
+            print
+        } else {
+            print
+        }
         next
     }
     # Skip old key-value pairs in target section
-    in_target && /^[a-zA-Z_]/ {
+    in_target {
+        if ($0 ~ /^[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]*=/) next
+        print
         next
     }
     # Print everything else
-    !in_target {
-        print
-    }
+    { print }
     END {
-        # If section was found but keys not yet written, write them
-        if (found == 1 && in_target) {
-            for (i in pairs) {
-                if (pairs[i] != "") print pairs[i]
-            }
-        }
         # If section was never found, append it
         if (found == 0) {
             print ""
             print section_header
+            for (i in pairs) {
+                if (pairs[i] != "") print pairs[i]
+            }
+        } else if (found == 1 && wrote == 0) {
             for (i in pairs) {
                 if (pairs[i] != "") print pairs[i]
             }
@@ -241,7 +247,11 @@ awsprof_ini_write_section() {
 
     # Run awk to create new file content
     if [[ -f "$file" ]]; then
-        awk -v section="$section" -v kvpairs="$kvpairs_str" "$awk_script" "$file" > "$temp_file"
+        if ! awk -v section="$section" -v kvpairs="$kvpairs_str" "$awk_script" "$file" > "$temp_file"; then
+            awsprof_error "Failed to write section '$section' to temp file"
+            rm -f "$temp_file"
+            return 1
+        fi
     else
         # Create new file with section
         echo "[$section]" > "$temp_file"
@@ -250,15 +260,37 @@ awsprof_ini_write_section() {
         done
     fi
 
-    # Atomic move and set permissions
-    if ! mv "$temp_file" "$file" 2>/dev/null; then
-        awsprof_error "Failed to write credentials file: $file"
+    if [[ $crlf -eq 1 ]]; then
+        if ! sed -e 's/\r$//' -e 's/$/\r/' "$temp_file" > "${temp_file}.crlf"; then
+            awsprof_error "Failed to normalize CRLF line endings"
+            rm -f "$temp_file" "${temp_file}.crlf"
+            return 1
+        fi
+        mv "${temp_file}.crlf" "$temp_file" || {
+            awsprof_error "Failed to update temp file with CRLF"
+            rm -f "$temp_file" "${temp_file}.crlf"
+            return 1
+        }
+    fi
+
+    if ! chmod 600 "$temp_file" 2>/dev/null; then
+        awsprof_error "Failed to set permissions on temp file"
         rm -f "$temp_file"
         return 1
     fi
 
-    if ! chmod 600 "$file" 2>/dev/null; then
-        awsprof_error "Failed to set permissions on: $file"
+    # Create backup if file exists
+    if [[ -f "$file" ]]; then
+        awsprof_backup_credentials "$file" || {
+            rm -f "$temp_file"
+            return 1
+        }
+    fi
+
+    # Atomic move
+    if ! mv "$temp_file" "$file" 2>/dev/null; then
+        awsprof_error "Failed to write credentials file: $file"
+        rm -f "$temp_file"
         return 1
     fi
 
@@ -268,12 +300,10 @@ awsprof_ini_write_section() {
 awsprof_ini_delete_section() {
     local section="$1"
     local file="${AWS_SHARED_CREDENTIALS_FILE:-$_awsprof_credentials}"
-    local temp_file=$(mktemp)
 
     # Check if section parameter provided
     if [[ -z "$section" ]]; then
         awsprof_error "Section name required"
-        rm -f "$temp_file"
         return 1
     fi
 
@@ -284,48 +314,84 @@ awsprof_ini_delete_section() {
         return 1
     fi
 
+    local dir
+    dir=$(dirname "$file")
+    local temp_file
+    temp_file=$(mktemp -p "$dir" ".awsprof.XXXXXX") || {
+        awsprof_error "Failed to create temp file in: $dir"
+        return 1
+    }
+
+    local crlf=0
+    if LC_ALL=C grep -q $'\r' "$file"; then
+        crlf=1
+    fi
+
+    # Awk script to remove section
+    # Delete section header and its key=value lines
+    if ! awk -v section="[$section]" '
+        BEGIN { in_target = 0; seen_kv = 0 }
+        /^\[/ {
+            if ($0 == section) {
+                in_target = 1
+                seen_kv = 0
+                next
+            }
+            in_target = 0
+            seen_kv = 0
+            print
+            next
+        }
+        in_target {
+            if ($0 ~ /^[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]*=/) {
+                seen_kv = 1
+                next
+            }
+            if ($0 ~ /^$/ || $0 ~ /^[;#]/) {
+                if (seen_kv == 1) {
+                    in_target = 0
+                    print
+                }
+                next
+            }
+            next
+        }
+        { print }
+    ' "$file" > "$temp_file"; then
+        awsprof_error "Failed to delete section '$section' to temp file"
+        rm -f "$temp_file"
+        return 1
+    fi
+
+    if [[ $crlf -eq 1 ]]; then
+        if ! sed -e 's/\r$//' -e 's/$/\r/' "$temp_file" > "${temp_file}.crlf"; then
+            awsprof_error "Failed to normalize CRLF line endings"
+            rm -f "$temp_file" "${temp_file}.crlf"
+            return 1
+        fi
+        mv "${temp_file}.crlf" "$temp_file" || {
+            awsprof_error "Failed to update temp file with CRLF"
+            rm -f "$temp_file" "${temp_file}.crlf"
+            return 1
+        }
+    fi
+
+    if ! chmod 600 "$temp_file" 2>/dev/null; then
+        awsprof_error "Failed to set permissions on temp file"
+        rm -f "$temp_file"
+        return 1
+    fi
+
     # Create backup
     awsprof_backup_credentials "$file" || {
         rm -f "$temp_file"
         return 1
     }
 
-    # Awk script to remove section
-    # Delete section header and its key=value lines
-    # Stop deleting when we hit a blank line, comment, or next section
-    awk -v section="[$section]" '
-        BEGIN { in_target = 0 }
-        /^\[/ {
-            # Check if this is the target section
-            in_target = ($0 == section)
-            if (!in_target) print
-            next
-        }
-        # If in target section and it is a key=value line, skip it
-        in_target && /^[a-zA-Z_].*=/ {
-            next
-        }
-        # If in target and it is blank or comment, stop deleting and print
-        in_target && (/^$/ || /^[;#]/) {
-            in_target = 0
-            print
-            next
-        }
-        # If not in target, print everything
-        !in_target {
-            print
-        }
-    ' "$file" > "$temp_file"
-
-    # Atomic move and set permissions
+    # Atomic move
     if ! mv "$temp_file" "$file" 2>/dev/null; then
         awsprof_error "Failed to write credentials file: $file"
         rm -f "$temp_file"
-        return 1
-    fi
-
-    if ! chmod 600 "$file" 2>/dev/null; then
-        awsprof_error "Failed to set permissions on: $file"
         return 1
     fi
 
@@ -356,6 +422,7 @@ awsprof_cmd_list() {
 
 awsprof_cmd_use() {
     local profile_name="$1"
+    local extra_arg="$2"
 
     # Validate parameter provided
     if [[ -z "$profile_name" ]]; then
@@ -364,11 +431,18 @@ awsprof_cmd_use() {
         return 1
     fi
 
+    # Reject if extra arguments provided
+    if [[ -n "$extra_arg" ]]; then
+        awsprof_error "Too many arguments: expected profile name only"
+        awsprof_msg "Usage: awsprof use <profile-name>"
+        return 1
+    fi
+
     # Validate profile exists
     local profiles
     profiles=$(awsprof_ini_list_sections) || return 1
 
-    if ! echo "$profiles" | grep -qx "$profile_name"; then
+    if ! printf '%s\n' "$profiles" | grep -Fxq "$profile_name"; then
         awsprof_error "Profile '$profile_name' not found"
         return 1
     fi
@@ -397,6 +471,7 @@ awsprof_cmd_whoami() {
 
 awsprof_cmd_add() {
     local profile_name="$1"
+    local extra_arg="$2"
 
     # Validate profile name provided
     if [[ -z "$profile_name" ]]; then
@@ -405,10 +480,19 @@ awsprof_cmd_add() {
         return 1
     fi
 
+    # Reject if extra arguments provided
+    if [[ -n "$extra_arg" ]]; then
+        awsprof_error "Too many arguments: expected profile name only"
+        awsprof_msg "Usage: awsprof add <profile-name>"
+        return 1
+    fi
+
     # Check if profile already exists
     local profiles
-    profiles=$(awsprof_ini_list_sections 2>/dev/null) || profiles=""
-    if echo "$profiles" | grep -qx "$profile_name"; then
+    if ! profiles=$(awsprof_ini_list_sections); then
+        return 1
+    fi
+    if printf '%s\n' "$profiles" | grep -Fxq "$profile_name"; then
         awsprof_error "Profile '$profile_name' already exists. Use 'awsprof edit' to modify."
         return 1
     fi
@@ -419,7 +503,7 @@ awsprof_cmd_add() {
     local secret_access_key
     read -p "AWS Access Key ID: " access_key_id
     read -s -p "AWS Secret Access Key: " secret_access_key
-    echo  # Newline after hidden input
+    printf '\n' >&2  # Newline after hidden input
 
     # Validate credentials are not empty
     if [[ -z "$access_key_id" ]] || [[ -z "$secret_access_key" ]]; then
@@ -427,9 +511,14 @@ awsprof_cmd_add() {
         return 1
     fi
 
-    # Basic format validation (AWS access keys typically start with AKIA)
-    if [[ ! "$access_key_id" =~ ^AK[A-Z0-9]{18}$ ]]; then
-        awsprof_warn "Access Key ID format may be invalid (expected AKIA... format)"
+    # Basic format validation
+    if [[ ! "$access_key_id" =~ ^(AKIA|ASIA)[A-Z0-9]{16}$ ]]; then
+        awsprof_error "Invalid Access Key ID format"
+        return 1
+    fi
+    if [[ ! "$secret_access_key" =~ ^[A-Za-z0-9/+=]{40}$ ]]; then
+        awsprof_error "Invalid Secret Access Key format"
+        return 1
     fi
 
     # Write profile using Story 2.1 function
@@ -449,6 +538,7 @@ awsprof_cmd_add() {
 # awsprof_cmd_edit - Edit an existing profile
 awsprof_cmd_edit() {
     local profile_name="$1"
+    local extra_arg="$2"
 
     # Validate profile name provided
     if [[ -z "$profile_name" ]]; then
@@ -457,10 +547,19 @@ awsprof_cmd_edit() {
         return 1
     fi
 
+    # Reject if extra arguments provided
+    if [[ -n "$extra_arg" ]]; then
+        awsprof_error "Too many arguments: expected profile name only"
+        awsprof_msg "Usage: awsprof edit <profile-name>"
+        return 1
+    fi
+
     # Check if profile exists
     local profiles
-    profiles=$(awsprof_ini_list_sections 2>/dev/null) || profiles=""
-    if ! echo "$profiles" | grep -qx "$profile_name"; then
+    if ! profiles=$(awsprof_ini_list_sections); then
+        return 1
+    fi
+    if ! printf '%s\n' "$profiles" | grep -Fxq "$profile_name"; then
         awsprof_error "Profile '$profile_name' not found"
         return 1
     fi
@@ -471,7 +570,7 @@ awsprof_cmd_edit() {
     local secret_access_key
     read -p "AWS Access Key ID: " access_key_id
     read -s -p "AWS Secret Access Key: " secret_access_key
-    echo  # Newline after hidden input
+    printf '\n' >&2  # Newline after hidden input
 
     # Validate credentials are not empty
     if [[ -z "$access_key_id" ]] || [[ -z "$secret_access_key" ]]; then
@@ -479,9 +578,14 @@ awsprof_cmd_edit() {
         return 1
     fi
 
-    # Basic format validation (AWS access keys typically start with AKIA)
-    if [[ ! "$access_key_id" =~ ^AK[A-Z0-9]{18}$ ]]; then
-        awsprof_warn "Access Key ID format may be invalid (expected AKIA... format)"
+    # Basic format validation
+    if [[ ! "$access_key_id" =~ ^(AKIA|ASIA)[A-Z0-9]{16}$ ]]; then
+        awsprof_error "Invalid Access Key ID format"
+        return 1
+    fi
+    if [[ ! "$secret_access_key" =~ ^[A-Za-z0-9/+=]{40}$ ]]; then
+        awsprof_error "Invalid Secret Access Key format"
+        return 1
     fi
 
     # Write profile using Story 2.1 function
@@ -501,6 +605,7 @@ awsprof_cmd_edit() {
 # awsprof_cmd_remove - Remove an existing profile
 awsprof_cmd_remove() {
     local profile_name="$1"
+    local extra_arg="$2"
 
     # Validate profile name provided
     if [[ -z "$profile_name" ]]; then
@@ -509,10 +614,19 @@ awsprof_cmd_remove() {
         return 1
     fi
 
+    # Reject if extra arguments provided
+    if [[ -n "$extra_arg" ]]; then
+        awsprof_error "Too many arguments: expected profile name only"
+        awsprof_msg "Usage: awsprof remove <profile-name>"
+        return 1
+    fi
+
     # Check if profile exists
     local profiles
-    profiles=$(awsprof_ini_list_sections 2>/dev/null) || profiles=""
-    if ! echo "$profiles" | grep -qx "$profile_name"; then
+    if ! profiles=$(awsprof_ini_list_sections); then
+        return 1
+    fi
+    if ! printf '%s\n' "$profiles" | grep -Fxq "$profile_name"; then
         awsprof_error "Profile '$profile_name' not found"
         return 1
     fi
@@ -535,13 +649,26 @@ awsprof_cmd_import() {
 
     # Check if credentials file exists
     if [[ ! -f "$file" ]]; then
-        awsprof_msg "No credentials file found at $file"
-        return 0
+        awsprof_error "No credentials file found at $file"
+        return 1
     fi
 
-    # Get all profiles from credentials file
+    # Get all profiles from credentials file (capture parse errors)
     local profiles
-    profiles=$(awsprof_ini_list_sections "$file" 2>/dev/null) || profiles=""
+    local err_file
+    err_file=$(mktemp) || {
+        awsprof_error "Failed to create temp file for error capture"
+        return 0
+    }
+    local list_status=0
+    if profiles=$(awsprof_ini_list_sections "$file" 2>"$err_file"); then
+        list_status=0
+    else
+        list_status=$?
+    fi
+    local parse_errors
+    parse_errors=$(cat "$err_file" 2>/dev/null)
+    rm -f "$err_file"
 
     # Count profiles and prepare output
     local profile_count
@@ -562,6 +689,11 @@ awsprof_cmd_import() {
         awsprof_success "All profiles are accessible to awsprof"
     fi
 
+    if [[ $list_status -ne 0 ]] && [[ -n "$parse_errors" ]]; then
+        awsprof_warn "Errors encountered while parsing credentials file:"
+        awsprof_msg "$parse_errors"
+    fi
+
     return 0
 }
 
@@ -576,7 +708,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             exit $?
             ;;
         use)
-            awsprof_cmd_use "${2:-}"
+            awsprof_cmd_use "${2:-}" "${3:-}"
             exit $?
             ;;
         whoami)
@@ -584,15 +716,15 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             exit $?
             ;;
         add)
-            awsprof_cmd_add "${2:-}"
+            awsprof_cmd_add "${2:-}" "${3:-}"
             exit $?
             ;;
         edit)
-            awsprof_cmd_edit "${2:-}"
+            awsprof_cmd_edit "${2:-}" "${3:-}"
             exit $?
             ;;
         remove)
-            awsprof_cmd_remove "${2:-}"
+            awsprof_cmd_remove "${2:-}" "${3:-}"
             exit $?
             ;;
         import)

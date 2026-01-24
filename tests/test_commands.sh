@@ -272,7 +272,7 @@ unset exit_code
 test_file="${SCRIPT_DIR}/fixtures/test_add_dup.tmp"
 echo "[duplicate]" > "$test_file"
 echo "key=value" >> "$test_file"
-result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add duplicate 2>&1) && exit_code=0 || exit_code=$?
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add duplicate 2>&1) && exit_code=0 || exit_code=$?
 if [[ $exit_code -eq 1 ]] && [[ "$result" == *"already exists"* ]]; then
     pass "awsprof add rejects duplicate profile"
 else
@@ -325,7 +325,7 @@ echo "key1=value1" >> "$test_file"
 echo "" >> "$test_file"
 echo "[profile2]" >> "$test_file"
 echo "key2=value2" >> "$test_file"
-result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add newprofile 2>&1) && exit_code=0 || exit_code=$?
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add newprofile 2>&1) && exit_code=0 || exit_code=$?
 profile1_exists=$(grep "^\[profile1\]" "$test_file" 2>/dev/null)
 profile2_exists=$(grep "^\[profile2\]" "$test_file" 2>/dev/null)
 if [[ $exit_code -eq 0 ]] && [[ -n "$profile1_exists" ]] && [[ -n "$profile2_exists" ]]; then
@@ -341,7 +341,7 @@ unset exit_code
 test_file="${SCRIPT_DIR}/fixtures/test_add_chmod.tmp"
 echo "[test]" > "$test_file"
 chmod 644 "$test_file"
-result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add newprofile 2>&1) && exit_code=0 || exit_code=$?
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add newprofile 2>&1) && exit_code=0 || exit_code=$?
 perms=$(stat -c "%a" "$test_file" 2>/dev/null || stat -f "%A" "$test_file" 2>/dev/null)
 if [[ $exit_code -eq 0 ]] && [[ "$perms" == "600" ]]; then
     pass "awsprof add sets chmod 600"
@@ -369,7 +369,7 @@ rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 test_file="${SCRIPT_DIR}/fixtures/test_add_list.tmp"
 echo "[existing]" > "$test_file"
 echo "key=value" >> "$test_file"
-echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add integration-test 2>/dev/null
+echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add integration-test 2>/dev/null
 list_result=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" list 2>/dev/null)
 if [[ "$list_result" == *"integration-test"* ]]; then
     pass "awsprof add then list shows new profile"
@@ -383,7 +383,7 @@ rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 test_file="${SCRIPT_DIR}/fixtures/test_add_use.tmp"
 echo "[existing]" > "$test_file"
 echo "key=value" >> "$test_file"
-echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add switch-test 2>/dev/null
+echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add switch-test 2>/dev/null
 (
     eval "$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" use switch-test 2>/dev/null)"
     [[ "$AWS_PROFILE" == "switch-test" ]] && exit 0 || exit 1
@@ -396,9 +396,35 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
+# Test 27: add rejects invalid access key format
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_add_invalid_access.tmp"
+echo "[test]" > "$test_file"
+result=$(echo -e "INVALIDKEY\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add badaccess 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"Invalid Access Key ID format"* ]]; then
+    pass "awsprof add rejects invalid access key format"
+else
+    fail "awsprof add should reject invalid access key format (exit=$exit_code)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 28: add rejects invalid secret key format
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_add_invalid_secret.tmp"
+echo "[test]" > "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nshortsecret" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add badsecret 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"Invalid Secret Access Key format"* ]]; then
+    pass "awsprof add rejects invalid secret key format"
+else
+    fail "awsprof add should reject invalid secret key format (exit=$exit_code)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
 #=== EDIT COMMAND TESTS ===
 
-# Test 27: edit existing profile successfully
+# Test 29: edit existing profile successfully
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_edit.tmp"
 echo "[testprofile]" > "$test_file"
@@ -417,12 +443,12 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
-# Test 28: edit non-existent profile rejection
+# Test 30: edit non-existent profile rejection
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_edit_noexist.tmp"
 echo "[existing]" > "$test_file"
 echo "key=value" >> "$test_file"
-result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit nonexistent 2>&1) && exit_code=0 || exit_code=$?
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit nonexistent 2>&1) && exit_code=0 || exit_code=$?
 if [[ $exit_code -eq 1 ]] && [[ "$result" == *"not found"* ]]; then
     pass "awsprof edit rejects non-existent profile"
 else
@@ -431,7 +457,7 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
-# Test 29: edit missing profile name parameter
+# Test 31: edit missing profile name parameter
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_edit_noparam.tmp"
 echo "[existing]" > "$test_file"
@@ -444,7 +470,7 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
-# Test 30: edit with empty access key
+# Test 32: edit with empty access key
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_edit_empty.tmp"
 echo "[emptykey]" > "$test_file"
@@ -459,7 +485,7 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
-# Test 31: edit with empty secret key
+# Test 33: edit with empty secret key
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_edit_empty2.tmp"
 echo "[emptysecret]" > "$test_file"
@@ -474,7 +500,7 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
-# Test 32: edit preserves other profiles
+# Test 34: edit preserves other profiles
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_edit_preserve.tmp"
 echo "[profile1]" > "$test_file"
@@ -484,7 +510,7 @@ echo "" >> "$test_file"
 echo "[profile2]" >> "$test_file"
 echo "aws_access_key_id=KEY2" >> "$test_file"
 echo "aws_secret_access_key=SECRET2" >> "$test_file"
-result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit profile1 2>&1) && exit_code=0 || exit_code=$?
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit profile1 2>&1) && exit_code=0 || exit_code=$?
 profile1_exists=$(grep "^\[profile1\]" "$test_file" 2>/dev/null)
 profile2_exists=$(grep "^\[profile2\]" "$test_file" 2>/dev/null)
 profile2_key=$(grep -A1 "^\[profile2\]" "$test_file" 2>/dev/null | grep "KEY2")
@@ -496,14 +522,14 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
-# Test 33: edit sets chmod 600
+# Test 35: edit sets chmod 600
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_edit_chmod.tmp"
 echo "[testprofile]" > "$test_file"
 echo "aws_access_key_id=OLDKEY" >> "$test_file"
 echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
 chmod 644 "$test_file"
-result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit testprofile 2>&1) && exit_code=0 || exit_code=$?
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit testprofile 2>&1) && exit_code=0 || exit_code=$?
 perms=$(stat -c "%a" "$test_file" 2>/dev/null || stat -f "%A" "$test_file" 2>/dev/null)
 if [[ $exit_code -eq 0 ]] && [[ "$perms" == "600" ]]; then
     pass "awsprof edit sets chmod 600"
@@ -513,7 +539,7 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
-# Test 34: edit never displays secret in output
+# Test 36: edit never displays secret in output
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_edit_secret.tmp"
 echo "[testprofile]" > "$test_file"
@@ -528,13 +554,13 @@ else
 fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 
-# Test 35: integration - edit then list
+# Test 37: integration - edit then list
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_edit_list.tmp"
 echo "[tolist]" > "$test_file"
 echo "aws_access_key_id=OLDKEY" >> "$test_file"
 echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
-echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit tolist 2>/dev/null
+echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit tolist 2>/dev/null
 list_result=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" list 2>/dev/null)
 if [[ "$list_result" == *"tolist"* ]]; then
     pass "awsprof edit then list shows profile"
@@ -543,13 +569,13 @@ else
 fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 
-# Test 36: integration - edit then use
+# Test 38: integration - edit then use
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_edit_use.tmp"
 echo "[touse]" > "$test_file"
 echo "aws_access_key_id=OLDKEY" >> "$test_file"
 echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
-echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit touse 2>/dev/null
+echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit touse 2>/dev/null
 (
     eval "$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" use touse 2>/dev/null)"
     [[ "$AWS_PROFILE" == "touse" ]] && exit 0 || exit 1
@@ -562,9 +588,39 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
+# Test 39: edit rejects invalid access key format
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit_invalid_access.tmp"
+echo "[testprofile]" > "$test_file"
+echo "aws_access_key_id=OLDKEY" >> "$test_file"
+echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
+result=$(echo -e "INVALIDKEY\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit testprofile 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"Invalid Access Key ID format"* ]]; then
+    pass "awsprof edit rejects invalid access key format"
+else
+    fail "awsprof edit should reject invalid access key format (exit=$exit_code)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 40: edit rejects invalid secret key format
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit_invalid_secret.tmp"
+echo "[testprofile]" > "$test_file"
+echo "aws_access_key_id=OLDKEY" >> "$test_file"
+echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nshortsecret" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit testprofile 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"Invalid Secret Access Key format"* ]]; then
+    pass "awsprof edit rejects invalid secret key format"
+else
+    fail "awsprof edit should reject invalid secret key format (exit=$exit_code)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
 # ===== REMOVE COMMAND TESTS (Story 2.4) =====
 
-# Test 37: Remove existing profile successfully
+# Test 41: Remove existing profile successfully
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
 echo "[keep-this]" > "$test_file"
@@ -588,7 +644,7 @@ rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 unset stderr
 
-# Test 38: Non-existent profile rejection
+# Test 42: Non-existent profile rejection
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
 echo "[exists]" > "$test_file"
@@ -603,7 +659,7 @@ rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 unset stderr
 
-# Test 39: Missing profile name parameter
+# Test 43: Missing profile name parameter
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
 echo "[test]" > "$test_file"
@@ -617,7 +673,7 @@ rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 unset stderr
 
-# Test 40: Remove only profile (empty file result)
+# Test 44: Remove only profile (empty file result)
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
 echo "[only-profile]" > "$test_file"
@@ -634,7 +690,7 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
-# Test 41: Other profiles preserved after deletion
+# Test 45: Other profiles preserved after deletion
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
 echo "[profile1]" > "$test_file"
@@ -654,7 +710,7 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
-# Test 42: Backup created before deletion
+# Test 46: Backup created before deletion
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
 echo "[remove-me]" > "$test_file"
@@ -670,7 +726,71 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
-# Test 43: chmod 600 maintained on credentials file
+# Test 47: Backup filename format is correct
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
+echo "[remove-me]" > "$test_file"
+echo "aws_access_key_id=DELETE123" >> "$test_file"
+AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove remove-me >/dev/null 2>&1 || exit_code=$?
+exit_code=${exit_code:-0}
+backup_file=$(ls -t "${test_file}.bak."* 2>/dev/null | head -n 1)
+if [[ $exit_code -eq 0 ]] && [[ "$backup_file" =~ \.bak\.[0-9]{8}-[0-9]{6}$ ]]; then
+    pass "awsprof remove creates timestamped backup filename"
+else
+    fail "awsprof remove should create timestamped backup filename"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 48: Removal failure leaves original intact
+((TESTS_RUN++))
+temp_dir=$(mktemp -d)
+test_file="${temp_dir}/credentials"
+echo "[only]" > "$test_file"
+echo "aws_access_key_id=ONLY123" >> "$test_file"
+chmod 500 "$temp_dir"
+orig_checksum=$(cksum "$test_file" | awk '{print $1}')
+AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove only >/dev/null 2>&1 || exit_code=$?
+exit_code=${exit_code:-0}
+new_checksum=$(cksum "$test_file" | awk '{print $1}')
+if [[ $exit_code -ne 0 ]] && [[ "$orig_checksum" == "$new_checksum" ]]; then
+    pass "awsprof remove fails safely without modifying original"
+else
+    fail "awsprof remove should not modify original on failure"
+fi
+chmod 700 "$temp_dir"
+rm -rf "$temp_dir"
+unset exit_code
+
+# Test 49: Removal failure after backup leaves original intact
+((TESTS_RUN++))
+temp_dir=$(mktemp -d)
+test_file="${temp_dir}/credentials"
+echo "[only]" > "$test_file"
+echo "aws_access_key_id=ONLY123" >> "$test_file"
+orig_checksum=$(cksum "$test_file" | awk '{print $1}')
+mkdir -p "${temp_dir}/bin"
+cat > "${temp_dir}/bin/mv" <<EOF
+#!/usr/bin/env bash
+if [[ "\$2" == "${test_file}" ]]; then
+  exit 1
+fi
+exec /bin/mv "$@"
+EOF
+chmod +x "${temp_dir}/bin/mv"
+PATH="${temp_dir}/bin:$PATH" AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove only >/dev/null 2>&1 || exit_code=$?
+exit_code=${exit_code:-0}
+new_checksum=$(cksum "$test_file" | awk '{print $1}')
+backup_count=$(ls "${test_file}.bak."* 2>/dev/null | wc -l)
+if [[ $exit_code -ne 0 ]] && [[ "$orig_checksum" == "$new_checksum" ]] && [[ $backup_count -ge 1 ]]; then
+    pass "awsprof remove preserves original when move fails"
+else
+    fail "awsprof remove should not modify original when move fails"
+fi
+rm -rf "$temp_dir"
+unset exit_code
+
+# Test 50: chmod 600 maintained on credentials file
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
 echo "[remove-me]" > "$test_file"
@@ -688,7 +808,7 @@ rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 unset perms
 
-# Test 44: Integration - remove then list
+# Test 51: Integration - remove then list
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
 echo "[profile1]" > "$test_file"
@@ -707,7 +827,7 @@ rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 unset list_output
 
-# Test 45: Integration - remove then attempt to use deleted profile
+# Test 52: Integration - remove then attempt to use deleted profile
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
 echo "[deleted-profile]" > "$test_file"
@@ -723,7 +843,7 @@ rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 unset stderr
 
-# Test 46: Error messages format and exit codes
+# Test 53: Error messages format and exit codes
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
 echo "[test]" > "$test_file"
@@ -739,7 +859,7 @@ unset stderr
 
 # ===== IMPORT COMMAND TESTS (Story 2.5) =====
 
-# Test 47: Import profiles from valid credentials file
+# Test 54: Import profiles from valid credentials file
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
 echo "[profile1]" > "$test_file"
@@ -757,7 +877,7 @@ rm -f "$test_file" 2>/dev/null
 unset exit_code
 unset stderr
 
-# Test 48: Import with empty credentials file
+# Test 55: Import with empty credentials file
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
 touch "$test_file"
@@ -772,7 +892,7 @@ rm -f "$test_file" 2>/dev/null
 unset exit_code
 unset stderr
 
-# Test 49: Import with single profile
+# Test 56: Import with single profile
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
 echo "[onlyprofile]" > "$test_file"
@@ -788,7 +908,7 @@ rm -f "$test_file" 2>/dev/null
 unset exit_code
 unset stderr
 
-# Test 50: Import with many profiles (10+)
+# Test 57: Import with many profiles (10+)
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
 for i in {1..12}; do
@@ -806,7 +926,7 @@ rm -f "$test_file" 2>/dev/null
 unset exit_code
 unset stderr
 
-# Test 51: Import with comments and blank lines
+# Test 58: Import with comments and blank lines
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
 cat > "$test_file" <<'EOF'
@@ -834,19 +954,19 @@ unset exit_code
 unset stderr
 unset file_size_before
 
-# Test 52: Import when credentials file missing
+# Test 59: Import when credentials file missing
 ((TESTS_RUN++))
 stderr=$(AWS_SHARED_CREDENTIALS_FILE="/nonexistent/credentials" "${ROOT_DIR}/awsprof" import 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
 exit_code=${exit_code:-0}
-if [[ $exit_code -eq 0 ]] && [[ "$stderr" == *"No credentials file found"* ]]; then
-    pass "awsprof import handles missing credentials file gracefully"
+if [[ $exit_code -eq 1 ]] && [[ "$stderr" == *"No credentials file found"* ]]; then
+    pass "awsprof import handles missing credentials file with error"
 else
-    fail "awsprof import should handle missing file with exit 0"
+    fail "awsprof import should exit 1 when credentials file missing"
 fi
 unset exit_code
 unset stderr
 
-# Test 53: Import with malformed INI syntax
+# Test 60: Import with malformed INI syntax
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
 cat > "$test_file" <<'EOF'
@@ -854,22 +974,20 @@ cat > "$test_file" <<'EOF'
 aws_access_key_id=KEY1
 [malformed
 aws_access_key_id=BAD
-[valid2]
-aws_access_key_id=KEY2
 EOF
 stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" import 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
 exit_code=${exit_code:-0}
-# Should still detect valid profiles, handle errors gracefully
-if [[ $exit_code -eq 0 ]]; then
+# Should detect valid profiles and report errors
+if [[ $exit_code -eq 0 ]] && [[ "$stderr" == *"Found 1 profiles"* ]] && [[ "$stderr" == *"valid1"* ]] && [[ "$stderr" == *"Malformed"* ]]; then
     pass "awsprof import handles malformed files gracefully"
 else
-    fail "awsprof import should handle malformed files"
+    fail "awsprof import should report profiles and errors on malformed files"
 fi
 rm -f "$test_file" 2>/dev/null
 unset exit_code
 unset stderr
 
-# Test 54: Import with special characters in profile names
+# Test 61: Import with special characters in profile names
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
 echo "[profile-with-dashes]" > "$test_file"
@@ -889,7 +1007,7 @@ rm -f "$test_file" 2>/dev/null
 unset exit_code
 unset stderr
 
-# Test 55: Integration - import then list consistency
+# Test 62: Integration - import then list consistency
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
 echo "[test1]" > "$test_file"
@@ -907,7 +1025,7 @@ rm -f "$test_file" 2>/dev/null
 unset import_output
 unset list_output
 
-# Test 56: Exit codes always 0 (informational)
+# Test 63: Import exit codes - success vs error
 ((TESTS_RUN++))
 test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
 echo "[test]" > "$test_file"
@@ -915,16 +1033,96 @@ echo "[test]" > "$test_file"
 AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" import >/dev/null 2>&1
 exit_code=$?
 rm -f "$test_file" 2>/dev/null
-# Test with missing file - should ALSO exit 0 (informational)
+# Test with missing file - should exit 1 (error condition)
 AWS_SHARED_CREDENTIALS_FILE="/nonexistent/file" "${ROOT_DIR}/awsprof" import >/dev/null 2>&1
 exit_code_missing=$?
-if [[ $exit_code -eq 0 ]] && [[ $exit_code_missing -eq 0 ]]; then
-    pass "awsprof import always exits 0 (informational)"
+if [[ $exit_code -eq 0 ]] && [[ $exit_code_missing -eq 1 ]]; then
+    pass "awsprof import exits correctly (0 on success, 1 on error)"
 else
-    fail "awsprof import should always exit 0"
+    fail "awsprof import should exit 0 on success, 1 on missing file"
 fi
 unset exit_code
 unset exit_code_missing
+
+# Test 64: Add profile with special characters in name
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_special.tmp"
+touch "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add "profile-with-dash" 2>&1)
+if grep -q "^\[profile-with-dash\]" "$test_file" 2>/dev/null; then
+    pass "awsprof add accepts profile names with dashes"
+else
+    fail "awsprof add should accept profile names with dashes"
+fi
+rm -f "$test_file" 2>/dev/null
+
+# Test 65: Add profile rejects extra arguments
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_extra.tmp"
+touch "$test_file"
+stderr=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add "myprofile" "extra_argument" 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ $exit_code -eq 1 ]] && [[ "$stderr" == *"Too many arguments"* ]]; then
+    pass "awsprof add rejects extra arguments"
+else
+    fail "awsprof add should reject extra arguments"
+fi
+rm -f "$test_file" 2>/dev/null
+unset exit_code
+
+# Test 66: Edit profile with special characters in name
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_special_edit.tmp"
+echo "[profile_with_underscore]" > "$test_file"
+echo "aws_access_key_id=OLDKEY" >> "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit "profile_with_underscore" 2>&1)
+if grep -q "AKIAIOSFODNN7EXAMPLE" "$test_file" 2>/dev/null; then
+    pass "awsprof edit accepts profile names with underscores"
+else
+    fail "awsprof edit should accept profile names with underscores"
+fi
+rm -f "$test_file" 2>/dev/null
+
+# Test 67: Edit profile rejects extra arguments
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit_extra.tmp"
+echo "[myprofile]" > "$test_file"
+echo "aws_access_key_id=KEY" >> "$test_file"
+stderr=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit "myprofile" "extra_arg" 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ $exit_code -eq 1 ]] && [[ "$stderr" == *"Too many arguments"* ]]; then
+    pass "awsprof edit rejects extra arguments"
+else
+    fail "awsprof edit should reject extra arguments"
+fi
+rm -f "$test_file" 2>/dev/null
+unset exit_code
+
+# Test 68: Remove profile rejects extra arguments
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_remove_extra.tmp"
+echo "[myprofile]" > "$test_file"
+echo "aws_access_key_id=KEY" >> "$test_file"
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove "myprofile" "extra_arg" 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ $exit_code -eq 1 ]] && [[ "$stderr" == *"Too many arguments"* ]]; then
+    pass "awsprof remove rejects extra arguments"
+else
+    fail "awsprof remove should reject extra arguments"
+fi
+rm -f "$test_file" 2>/dev/null
+unset exit_code
+
+# Test 69: Use profile rejects extra arguments
+((TESTS_RUN++))
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" use "default" "extra_arg" 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ $exit_code -eq 1 ]] && [[ "$stderr" == *"Too many arguments"* ]]; then
+    pass "awsprof use rejects extra arguments"
+else
+    fail "awsprof use should reject extra arguments"
+fi
+unset exit_code
 
 echo
 echo "=============================="

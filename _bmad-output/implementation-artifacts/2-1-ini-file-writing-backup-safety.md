@@ -1,6 +1,6 @@
 # Story 2.1: INI File Writing & Backup Safety
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -438,11 +438,11 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 
 ✅ Implemented `awsprof_ini_delete_section()` function
 - Removes section header and its key=value content
-- Stops deleting at blank lines or comments (preserves formatting)
+- Removes key/value lines while preserving inter-section comments/blank lines
 - Uses atomic write pattern with backup
-- Sets chmod 600 on modified files
+- Preserves CRLF when present
 
-✅ Comprehensive test suite added (17 total INI tests, all passing)
+✅ Comprehensive test suite added (24 total INI tests, all passing)
 - Test 9: Backup creates timestamped file
 - Test 10: Backup preserves file contents
 - Test 11: Write section adds new section
@@ -452,6 +452,13 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - Test 15: Delete section removes target section only
 - Test 16: Delete section preserves formatting
 - Test 17: Atomic write sets chmod 600
+- Test 18: Write preserves formatting inside target section
+- Test 19: Delete section removes full section (including comments/blank lines)
+- Test 20: CRLF line endings preserved on write
+- Test 21: Unicode section names and values
+- Test 22: Special characters in values preserved
+- Test 23: Malformed file handling creates backup and proceeds
+- Test 24: Temp file creation failure leaves original unchanged
 
 ✅ All existing tests still passing (16 command tests + 8 original INI tests)
 ✅ No regressions in Epic 1 functionality
@@ -460,17 +467,21 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 **Technical Implementation Details:**
 - Added FILE OPERATIONS section to awsprof script
 - Backup function uses `date +%Y%m%d-%H%M%S` for timestamp
-- Write function uses mktemp for atomic temp file creation
-- Delete function uses smart awk logic to preserve inter-section content
+- Write/delete use same-dir temp files for atomic replace
+- Awk failures are checked before replacing the original file
+- CRLF preserved when present in source file
+- Delete function preserves inter-section content while removing the target section body
 - All functions respect AWS_SHARED_CREDENTIALS_FILE environment variable
 - Error handling includes cleanup of temp files on failure
 
 **Security Checklist Verified:**
 - ✅ Backup created BEFORE every write
 - ✅ Backup timestamp format correct (YYYYMMDD-HHMMSS)
-- ✅ Atomic write via temp file (no partial writes)
+- ✅ Atomic write via same-dir temp file (no partial writes)
 - ✅ chmod 600 on all credential files
 - ✅ Original file preserved on failure
+- ✅ Awk failures do not replace original file
+- ✅ CRLF line endings preserved when present
 - ✅ No secrets logged or echoed
 - ✅ Temp files cleaned up on failure
 - ✅ Error messages to stderr only
@@ -481,4 +492,4 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
   - `awsprof_backup_credentials()` - Timestamped backup creation
   - `awsprof_ini_write_section()` - Add/update INI sections
   - `awsprof_ini_delete_section()` - Delete INI sections
-- tests/test_ini.sh (modified) - Added 9 new tests (tests 9-17) for write/backup operations
+- tests/test_ini.sh (modified) - Added 16 new tests (tests 9-24) for write/backup operations

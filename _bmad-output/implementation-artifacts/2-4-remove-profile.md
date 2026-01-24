@@ -1,6 +1,6 @@
 # Story 2.4: Remove Profile
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -231,7 +231,7 @@ Claude Haiku 4.5 (claude-haiku-4-5-20251001)
 ### Debug Log References
 
 - Analysis ID: a290a19 (comprehensive artifact analysis for story context)
-- Implementation: Story 2.4 - Remove Profile (all 46 tests passing)
+- Implementation: Story 2.4 - Remove Profile (all command tests passing)
 
 ### Completion Notes List
 
@@ -248,14 +248,15 @@ Claude Haiku 4.5 (claude-haiku-4-5-20251001)
 - Validation pattern: parameter check → existence check → delete → success message
 
 ✅ **Testing:**
-- Added 10 comprehensive new tests (Tests 37-46 in test_commands.sh)
-- All 46 tests passing (36 existing + 10 new for remove)
-- All 17 INI tests passing (no regressions)
+- Added 13 comprehensive new tests (Tests 41-53 in test_commands.sh)
+- Explicit remove test range: Tests 41–53
+- All 63 command tests passing
+- All 24 INI tests passing (no regressions)
 - Complete AC coverage:
-  - AC1 (remove with backup, preserve others): Tests 37, 41, 42
-  - AC2 (reject non-existent): Tests 38, 46
-  - AC3 (handle empty file): Tests 40
-  - AC4 (preserve structure, atomic): Tests 41, 44, 45
+  - AC1 (remove with backup, preserve others): Tests 41, 45, 46, 47
+  - AC2 (reject non-existent): Tests 42, 53
+  - AC3 (handle empty file): Tests 44
+  - AC4 (preserve structure, atomic): Tests 45, 48, 49, 51, 52
 
 ✅ **Acceptance Criteria Verification:**
 - AC1: ✓ Remove profile with backup created, others preserved, chmod 600 maintained
@@ -293,5 +294,5 @@ Claude Haiku 4.5 (claude-haiku-4-5-20251001)
 - 1 new dispatch case (4 lines)
 - Help text update (1 line)
 - Section comment update (1 line)
-- 10 new tests (110 lines)
-- All tests passing (46/46 in commands, 17/17 in INI, 0 regressions)
+- 13 new tests (remove command)
+- All tests passing (63/63 in commands, 24/24 in INI, 0 regressions)

@@ -266,6 +266,132 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset AWS_SHARED_CREDENTIALS_FILE
 
+# Test 18: Write preserves comments and blank lines inside target section
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_write_inside_formatting.tmp"
+echo "[default]" > "$test_file"
+echo "# inside comment" >> "$test_file"
+echo "" >> "$test_file"
+echo "aws_access_key_id=OLDKEY" >> "$test_file"
+echo "" >> "$test_file"
+echo "; inside semicolon" >> "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_write_section "default" "aws_access_key_id=NEWKEY" 2>/dev/null
+inside_comment=$(grep "# inside comment" "$test_file" 2>/dev/null)
+inside_semicolon=$(grep "; inside semicolon" "$test_file" 2>/dev/null)
+if [[ -n "$inside_comment" ]] && [[ -n "$inside_semicolon" ]]; then
+    pass "awsprof_ini_write_section preserves formatting inside section"
+else
+    fail "awsprof_ini_write_section lost formatting inside section"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 19: Delete section removes entire section including comments/blank lines
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_delete_full.tmp"
+echo "[target]" > "$test_file"
+echo "# comment in section" >> "$test_file"
+echo "" >> "$test_file"
+echo "key=value" >> "$test_file"
+echo "" >> "$test_file"
+echo "[other]" >> "$test_file"
+echo "keep=me" >> "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_delete_section "target" 2>/dev/null
+target_gone=$(grep "^\[target\]" "$test_file" 2>/dev/null)
+target_comment_gone=$(grep "comment in section" "$test_file" 2>/dev/null)
+other_present=$(grep -A1 "^\[other\]" "$test_file" 2>/dev/null | grep "keep=me")
+if [[ -z "$target_gone" ]] && [[ -z "$target_comment_gone" ]] && [[ -n "$other_present" ]]; then
+    pass "awsprof_ini_delete_section removes full section"
+else
+    fail "awsprof_ini_delete_section did not remove full section"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 20: CRLF line endings preserved on write
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_crlf.tmp"
+printf "[default]\r\naws_access_key_id=OLD\r\n" > "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_write_section "default" "aws_access_key_id=NEW" 2>/dev/null
+if LC_ALL=C grep -q $'\r' "$test_file" && LC_ALL=C grep -q $'aws_access_key_id=NEW\r' "$test_file"; then
+    pass "awsprof_ini_write_section preserves CRLF line endings"
+else
+    fail "awsprof_ini_write_section did not preserve CRLF line endings"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 21: Unicode section names and values
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_unicode.tmp"
+echo "[existing]" > "$test_file"
+unicode_section=$'unicode_\u2603'
+unicode_value=$'value_\u00e9'
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_write_section "$unicode_section" "key=${unicode_value}" 2>/dev/null
+unicode_found=$(grep -A1 "^\[$unicode_section\]" "$test_file" 2>/dev/null | grep "$unicode_value")
+if [[ -n "$unicode_found" ]]; then
+    pass "awsprof_ini_write_section handles unicode"
+else
+    fail "awsprof_ini_write_section failed unicode handling"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 22: Special characters in values preserved
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_special_chars.tmp"
+echo "[default]" > "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_write_section "default" "key=va#l;ue=with=equals" 2>/dev/null
+special_found=$(grep -A1 "^\[default\]" "$test_file" 2>/dev/null | grep "key=va#l;ue=with=equals")
+if [[ -n "$special_found" ]]; then
+    pass "awsprof_ini_write_section preserves special characters"
+else
+    fail "awsprof_ini_write_section lost special characters"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 23: Malformed file handling creates backup and proceeds
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_malformed_write.tmp"
+echo "[default" > "$test_file"
+echo "key=value" >> "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_write_section "newsection" "key=newvalue" 2>/dev/null && write_exit=0 || write_exit=$?
+backup_created=$(ls "${test_file}.bak."* 2>/dev/null | wc -l)
+if [[ $backup_created -ge 1 ]] && [[ $write_exit -eq 0 ]]; then
+    pass "awsprof_ini_write_section handles malformed file with backup"
+else
+    fail "awsprof_ini_write_section malformed handling failed"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 24: Temp file creation failure leaves original unchanged
+((TESTS_RUN++))
+temp_dir=$(mktemp -d)
+test_file="${temp_dir}/credentials"
+echo "[default]" > "$test_file"
+echo "key=value" >> "$test_file"
+chmod 500 "$temp_dir"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+orig_checksum=$(cksum "$test_file" | awk '{print $1}')
+awsprof_ini_write_section "default" "key=newvalue" 2>/dev/null && write_exit=0 || write_exit=$?
+new_checksum=$(cksum "$test_file" | awk '{print $1}')
+if [[ $write_exit -ne 0 ]] && [[ "$orig_checksum" == "$new_checksum" ]]; then
+    pass "awsprof_ini_write_section fails safely when temp file cannot be created"
+else
+    fail "awsprof_ini_write_section did not fail safely on temp file error"
+fi
+chmod 700 "$temp_dir"
+rm -rf "$temp_dir"
+unset AWS_SHARED_CREDENTIALS_FILE
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"
