@@ -1,6 +1,8 @@
 # Story 2.5: Import Existing Profiles
 
-Status: review
+Status: done
+
+**Code Review Status:** ✅ PASSED - Exit code consistency fixed (exit 1 on missing file), AC3 updated, all acceptance criteria verified
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
