@@ -59,7 +59,7 @@ development_status:
   3-1-shell-initialization-script-for-bash: done
   3-2-posix-sh-initialization-script: done
   3-3-project-profile-file-creation: review
-  3-4-directory-change-detection-and-profile-comparison: backlog
+  3-4-directory-change-detection-and-profile-comparison: ready-for-dev
   3-5-interactive-profile-switch-prompt: backlog
   3-6-shell-integration-robustness: backlog
   epic-3-retrospective: optional
