@@ -710,12 +710,14 @@ awsprof_hook_detect_profile() {
 
 # awsprof_cmd_init - Output bash shell initialization code
 awsprof_cmd_init() {
+    # Validate no extra arguments provided
+    if [[ $# -gt 0 ]]; then
+        awsprof_error "init command takes no arguments"
+        return 1
+    fi
+
     # Output shell code suitable for: eval "$(awsprof init)"
     # This defines the wrapper function, detection hook, and sets up PROMPT_COMMAND
-    # Get the path to the actual awsprof executable for use in the wrapper
-    local awsprof_path
-    awsprof_path=$(command -v awsprof) || awsprof_path="awsprof"
-
     cat <<INIT_SCRIPT
 # awsprof shell integration - source this in your ~/.bashrc
 # Usage: eval "\$(awsprof init)"
@@ -731,8 +733,9 @@ awsprof_hook_detect_profile() {
 }
 
 # Define wrapper function that properly handles environment variables
+# Uses 'command awsprof' to find the actual executable, not the function
 awsprof() {
-    eval "\$($awsprof_path "\$@")"
+    eval "\$(command awsprof "\$@")"
 }
 
 # Set up PROMPT_COMMAND hook for directory change detection
@@ -785,6 +788,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             exit $?
             ;;
         init)
+            if [[ -n "${2:-}" ]]; then
+                awsprof_error "init command takes no arguments"
+                exit 1
+            fi
             awsprof_cmd_init
             exit $?
             ;;

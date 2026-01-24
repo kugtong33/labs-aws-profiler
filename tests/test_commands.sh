@@ -1266,6 +1266,70 @@ else
 fi
 unset test_script result
 
+# Test 80: Wrapper function actually executes awsprof commands (CRITICAL FUNCTIONAL TEST)
+((TESTS_RUN++))
+test_script=$(mktemp)
+cat > "$test_script" <<EOF
+# Make sure awsprof is in PATH for the wrapper to find
+export PATH="${ROOT_DIR}:\$PATH"
+eval "\$("${ROOT_DIR}/awsprof" init)"
+# Now actually call the wrapper with a real command
+result=\$(awsprof list 2>&1 | head -1)
+if [[ -n "\$result" ]]; then
+    echo "wrapper_works"
+fi
+EOF
+result=$(bash "$test_script" 2>/dev/null)
+rm -f "$test_script"
+if [[ "$result" == "wrapper_works" ]]; then
+    pass "Wrapper function successfully executes awsprof commands"
+else
+    fail "Wrapper function should execute awsprof commands (got: $result)"
+fi
+unset test_script result
+
+# Test 81: Wrapper enables profile switching via eval (AC3 verification)
+((TESTS_RUN++))
+test_script=$(mktemp)
+cat > "$test_script" <<EOF
+# Make sure awsprof is in PATH for the wrapper to find
+export PATH="${ROOT_DIR}:\$PATH"
+eval "\$("${ROOT_DIR}/awsprof" init)"
+# Set up a test profile first
+mkdir -p ~/.aws
+cat > ~/.aws/credentials <<'CREDS'
+[test-profile-abc]
+aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+CREDS
+
+# Now use the wrapper to switch profiles
+awsprof use test-profile-abc >/dev/null 2>&1
+# Verify AWS_PROFILE is set in current shell (not a subshell)
+if [[ "\$AWS_PROFILE" == "test-profile-abc" ]]; then
+    echo "profile_set"
+fi
+EOF
+result=$(bash "$test_script" 2>/dev/null)
+rm -f "$test_script"
+if [[ "$result" == "profile_set" ]]; then
+    pass "Wrapper function enables profile switching in current shell (AC3)"
+else
+    fail "Wrapper should enable profile switching in current shell"
+fi
+unset test_script result
+
+# Test 82: Init command rejects extra arguments
+((TESTS_RUN++))
+init_with_args=$("${ROOT_DIR}/awsprof" init extra-arg 2>&1)
+init_exit=$?
+if [[ $init_exit -ne 0 ]]; then
+    pass "init command rejects extra arguments"
+else
+    fail "init command should reject extra arguments (exit code was: $init_exit)"
+fi
+unset init_with_args init_exit
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"
