@@ -1,6 +1,6 @@
 # Story 3.2: POSIX sh Initialization Script
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -299,7 +299,62 @@ Claude Haiku 4.5 (claude-haiku-4-5-20251001)
 - `awsprof` - Extended `awsprof_cmd_init()` with `--sh` flag support and conditional output (~40 lines changed)
 - `tests/test_commands.sh` - Added 10 new comprehensive tests (~180 lines added, fixed variable substitution in existing tests)
 
+### Code Review Findings and Fixes
+
+**CRITICAL BUG DISCOVERED (Fixed):**
+
+The wrapper function pattern had a critical flaw that also affected Story 3.1:
+- **Problem**: Wrapper unconditionally eval'd ALL output from awsprof commands
+- **Impact**: Commands like `whoami`, `list`, `help` output diagnostic text (not shell code)
+- **Failure**: `eval "No profile set (using default)"` causes syntax error (parentheses)
+- **Severity**: Users couldn't call informational commands through wrapper
+
+**Root Cause Analysis:**
+- Original pattern: `awsprof() { eval "$(command awsprof "$@")" }`
+- Works only for commands outputting shell code (`use`, `check`)
+- Fails for commands outputting text (`whoami`, `list`, `help`, etc.)
+
+**Solution Implemented:**
+- Added command-type checking before eval
+- Only eval for `use` and `check` commands
+- Other commands call awsprof directly without eval wrapper
+- Applied fix to both bash (Story 3.1) and POSIX sh (Story 3.2) versions
+
+**Code Changes:**
+```bash
+# Bash wrapper (lines 726-745):
+awsprof() {
+    local cmd="${1:-}"
+    if [[ "$cmd" == "use" || "$cmd" == "check" ]]; then
+        eval "$(command awsprof "$@")"  # Only for shell-code-outputting commands
+    else
+        command awsprof "$@"             # Direct execution for other commands
+    fi
+}
+
+# POSIX sh wrapper (lines 761-779):
+awsprof() {
+    cmd="${1:-}"
+    if [ "$cmd" = "use" ] || [ "$cmd" = "check" ]; then
+        eval "`command awsprof "$@"`"   # Only for shell-code-outputting commands
+    else
+        command awsprof "$@"             # Direct execution for other commands
+    fi
+}
+```
+
+**Testing:**
+- Added Test 93: Bash wrapper handles `whoami` without crashing
+- Added Test 94: Bash wrapper handles `list` without crashing
+- Added Test 95: POSIX sh wrapper handles `whoami` without crashing
+- All 95 tests passing (including new tests and all previous tests)
+
+**Impact:**
+- Users can now call `awsprof whoami`, `awsprof list`, `awsprof help` through wrapper
+- No breaking changes - backward compatible
+- Improves usability across bash and POSIX sh environments
+
 ### File List
 
-- `awsprof` - Main script (extended `awsprof_cmd_init()` function with --sh flag handling)
-- `tests/test_commands.sh` - Test suite (added 10 new tests for init --sh functionality)
+- `awsprof` - Main script (extended `awsprof_cmd_init()` function with --sh flag handling, plus critical wrapper bug fix)
+- `tests/test_commands.sh` - Test suite (added 13 new tests: 10 for init --sh, 3 for wrapper bug fix)
