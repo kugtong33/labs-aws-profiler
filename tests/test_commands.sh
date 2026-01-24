@@ -1493,6 +1493,89 @@ else
 fi
 unset sh_script result
 
+# Test 93: Wrapper handles informational commands (whoami) correctly
+((TESTS_RUN++))
+test_script=$(mktemp)
+cat > "$test_script" <<EOF
+export PATH="${ROOT_DIR}:\$PATH"
+eval "\$("${ROOT_DIR}/awsprof" init)"
+mkdir -p ~/.aws
+cat > ~/.aws/credentials << 'CREDS'
+[test-profile-abc]
+aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+CREDS
+awsprof use test-profile-abc >/dev/null 2>&1
+# Now test whoami through wrapper (should NOT crash, should output profile)
+result=\$(awsprof whoami 2>&1)
+if [ "\$result" = "test-profile-abc" ]; then
+    echo "whoami_works"
+fi
+EOF
+result=$(bash "$test_script" 2>/dev/null)
+rm -f "$test_script"
+if [[ "$result" == "whoami_works" ]]; then
+    pass "Wrapper handles informational commands (whoami) correctly"
+else
+    fail "Wrapper should handle whoami without crashing"
+fi
+unset test_script result
+
+# Test 94: Wrapper handles list command correctly
+((TESTS_RUN++))
+test_script=$(mktemp)
+cat > "$test_script" <<EOF
+export PATH="${ROOT_DIR}:\$PATH"
+eval "\$("${ROOT_DIR}/awsprof" init)"
+mkdir -p ~/.aws
+cat > ~/.aws/credentials << 'CREDS'
+[test-list-1]
+aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+CREDS
+# Test list through wrapper (should NOT crash, should output profiles)
+result=\$(awsprof list 2>&1 | head -1)
+if [ -n "\$result" ]; then
+    echo "list_works"
+fi
+EOF
+result=$(bash "$test_script" 2>/dev/null)
+rm -f "$test_script"
+if [[ "$result" == "list_works" ]]; then
+    pass "Wrapper handles list command correctly"
+else
+    fail "Wrapper should handle list without crashing"
+fi
+unset test_script result
+
+# Test 95: POSIX sh wrapper handles informational commands (whoami)
+((TESTS_RUN++))
+sh_script=$(mktemp)
+cat > "$sh_script" << SHEOF
+export PATH="${ROOT_DIR}:\$PATH"
+eval "\$("${ROOT_DIR}/awsprof" init --sh)"
+mkdir -p ~/.aws
+cat > ~/.aws/credentials << 'CREDS'
+[test-profile-sh]
+aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+CREDS
+awsprof use test-profile-sh >/dev/null 2>&1
+# Now test whoami through wrapper in sh (should NOT crash)
+result=\$(awsprof whoami 2>&1)
+if [ "\$result" = "test-profile-sh" ]; then
+    echo "whoami_sh_works"
+fi
+SHEOF
+result=$(sh "$sh_script" 2>/dev/null)
+rm -f "$sh_script"
+if [[ "$result" == "whoami_sh_works" ]]; then
+    pass "POSIX sh wrapper handles informational commands (whoami)"
+else
+    fail "POSIX sh wrapper should handle whoami without crashing"
+fi
+unset sh_script result
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"

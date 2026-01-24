@@ -741,8 +741,17 @@ awsprof_hook_detect_profile() {
 
 # Define wrapper function that properly handles environment variables
 # Uses 'command awsprof' to find the actual executable, not the function
+# IMPORTANT: Only eval output from commands that produce shell code (use, check)
+# For informational commands (list, whoami, help), call awsprof directly
 awsprof() {
-    eval "\$(command awsprof "\$@")"
+    local cmd="\${1:-}"
+    # Only use eval wrapper for commands that output shell code
+    if [[ "\$cmd" == "use" || "\$cmd" == "check" ]]; then
+        eval "\$(command awsprof "\$@")"
+    else
+        # For other commands, just execute them directly
+        command awsprof "\$@"
+    fi
 }
 
 # Set up PROMPT_COMMAND hook for directory change detection
@@ -767,8 +776,17 @@ INIT_SCRIPT
 # Define wrapper function that properly handles environment variables
 # Uses 'command awsprof' to find the actual executable, not the function
 # Note: POSIX sh uses backticks for maximum compatibility
+# IMPORTANT: Only eval output from commands that produce shell code (use, check)
+# For informational commands (list, whoami, help), call awsprof directly
 awsprof() {
-    eval "`command awsprof "$@"`"
+    cmd="${1:-}"
+    # Only use eval wrapper for commands that output shell code
+    if [ "$cmd" = "use" ] || [ "$cmd" = "check" ]; then
+        eval "`command awsprof "$@"`"
+    else
+        # For other commands, just execute them directly
+        command awsprof "$@"
+    fi
 }
 
 # LIMITATION: Automatic profile detection is NOT available in POSIX sh
