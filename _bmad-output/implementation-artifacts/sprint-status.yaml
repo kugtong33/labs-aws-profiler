@@ -61,5 +61,5 @@ development_status:
   3-3-project-profile-file-creation: review
   3-4-directory-change-detection-and-profile-comparison: review
   3-5-interactive-profile-switch-prompt: review
-  3-6-shell-integration-robustness: backlog
+  3-6-shell-integration-robustness: ready-for-dev
   epic-3-retrospective: optional
