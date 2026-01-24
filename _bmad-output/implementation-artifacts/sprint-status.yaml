@@ -47,8 +47,8 @@ development_status:
   1-4-show-current-profile: done
   epic-1-retrospective: done
 
-  epic-2: backlog
-  2-1-ini-file-writing-backup-safety: backlog
+  epic-2: in-progress
+  2-1-ini-file-writing-backup-safety: review
   2-2-add-new-profile: backlog
   2-3-edit-existing-profile: backlog
   2-4-remove-profile: backlog

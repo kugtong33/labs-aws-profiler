@@ -134,6 +134,204 @@ awsprof_ini_read_section() {
     return 0
 }
 
+#=== FILE OPERATIONS ===
+# awsprof_backup_credentials - Create timestamped backup of credentials file
+# awsprof_ini_write_section - Write or update a section in INI file
+# awsprof_ini_delete_section - Delete a section from INI file
+
+awsprof_backup_credentials() {
+    # Use AWS_SHARED_CREDENTIALS_FILE if set, otherwise default
+    local file="${1:-${AWS_SHARED_CREDENTIALS_FILE:-$_awsprof_credentials}}"
+
+    # Check if file exists
+    if [[ ! -f "$file" ]]; then
+        awsprof_error "Credentials file not found: $file"
+        return 1
+    fi
+
+    # Generate timestamp in YYYYMMDD-HHMMSS format
+    local timestamp=$(date +%Y%m%d-%H%M%S)
+    local backup_file="${file}.bak.${timestamp}"
+
+    # Copy to backup
+    if ! cp "$file" "$backup_file" 2>/dev/null; then
+        awsprof_error "Failed to create backup: $backup_file"
+        return 1
+    fi
+
+    return 0
+}
+
+awsprof_ini_write_section() {
+    local section="$1"
+    shift
+    local kvpairs=("$@")
+
+    local file="${AWS_SHARED_CREDENTIALS_FILE:-$_awsprof_credentials}"
+    local temp_file=$(mktemp)
+
+    # Check if section parameter provided
+    if [[ -z "$section" ]]; then
+        awsprof_error "Section name required"
+        rm -f "$temp_file"
+        return 1
+    fi
+
+    # Create backup if file exists
+    if [[ -f "$file" ]]; then
+        awsprof_backup_credentials "$file" || {
+            rm -f "$temp_file"
+            return 1
+        }
+    fi
+
+    # Build awk script for section write
+    local awk_script='
+    BEGIN {
+        section_header = "[" section "]"
+        found = 0
+        in_target = 0
+        split(kvpairs, pairs, "\n")
+    }
+    /^\[/ {
+        # If we were in target section, output new key-value pairs
+        if (in_target && found == 1) {
+            for (i in pairs) {
+                if (pairs[i] != "") print pairs[i]
+            }
+            found = 2  # Mark as already written
+        }
+        # Check if this is our target section
+        in_target = ($0 == section_header)
+        if (!in_target) print
+        if (in_target) print
+        next
+    }
+    # Skip old key-value pairs in target section
+    in_target && /^[a-zA-Z_]/ {
+        next
+    }
+    # Print everything else
+    !in_target {
+        print
+    }
+    END {
+        # If section was found but keys not yet written, write them
+        if (found == 1 && in_target) {
+            for (i in pairs) {
+                if (pairs[i] != "") print pairs[i]
+            }
+        }
+        # If section was never found, append it
+        if (found == 0) {
+            print ""
+            print section_header
+            for (i in pairs) {
+                if (pairs[i] != "") print pairs[i]
+            }
+        }
+    }
+    '
+
+    # Convert kvpairs array to newline-separated string
+    local kvpairs_str=""
+    for pair in "${kvpairs[@]}"; do
+        kvpairs_str="${kvpairs_str}${pair}"$'\n'
+    done
+
+    # Run awk to create new file content
+    if [[ -f "$file" ]]; then
+        awk -v section="$section" -v kvpairs="$kvpairs_str" "$awk_script" "$file" > "$temp_file"
+    else
+        # Create new file with section
+        echo "[$section]" > "$temp_file"
+        for pair in "${kvpairs[@]}"; do
+            echo "$pair" >> "$temp_file"
+        done
+    fi
+
+    # Atomic move and set permissions
+    if ! mv "$temp_file" "$file" 2>/dev/null; then
+        awsprof_error "Failed to write credentials file: $file"
+        rm -f "$temp_file"
+        return 1
+    fi
+
+    if ! chmod 600 "$file" 2>/dev/null; then
+        awsprof_error "Failed to set permissions on: $file"
+        return 1
+    fi
+
+    return 0
+}
+
+awsprof_ini_delete_section() {
+    local section="$1"
+    local file="${AWS_SHARED_CREDENTIALS_FILE:-$_awsprof_credentials}"
+    local temp_file=$(mktemp)
+
+    # Check if section parameter provided
+    if [[ -z "$section" ]]; then
+        awsprof_error "Section name required"
+        rm -f "$temp_file"
+        return 1
+    fi
+
+    # Check if file exists
+    if [[ ! -f "$file" ]]; then
+        awsprof_error "Credentials file not found: $file"
+        rm -f "$temp_file"
+        return 1
+    fi
+
+    # Create backup
+    awsprof_backup_credentials "$file" || {
+        rm -f "$temp_file"
+        return 1
+    }
+
+    # Awk script to remove section
+    # Delete section header and its key=value lines
+    # Stop deleting when we hit a blank line, comment, or next section
+    awk -v section="[$section]" '
+        BEGIN { in_target = 0 }
+        /^\[/ {
+            # Check if this is the target section
+            in_target = ($0 == section)
+            if (!in_target) print
+            next
+        }
+        # If in target section and it is a key=value line, skip it
+        in_target && /^[a-zA-Z_].*=/ {
+            next
+        }
+        # If in target and it is blank or comment, stop deleting and print
+        in_target && (/^$/ || /^[;#]/) {
+            in_target = 0
+            print
+            next
+        }
+        # If not in target, print everything
+        !in_target {
+            print
+        }
+    ' "$file" > "$temp_file"
+
+    # Atomic move and set permissions
+    if ! mv "$temp_file" "$file" 2>/dev/null; then
+        awsprof_error "Failed to write credentials file: $file"
+        rm -f "$temp_file"
+        return 1
+    fi
+
+    if ! chmod 600 "$file" 2>/dev/null; then
+        awsprof_error "Failed to set permissions on: $file"
+        return 1
+    fi
+
+    return 0
+}
+
 #=== PROFILE COMMANDS ===
 # awsprof_cmd_list - List available profiles
 # awsprof_cmd_use - Switch to a profile

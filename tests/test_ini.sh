@@ -97,6 +97,175 @@ else
     fail "awsprof_ini_read_section should report malformed INI"
 fi
 
+#=== FILE OPERATIONS TESTS ===
+
+# Test 9: Backup creates timestamped file
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_backup_source.tmp"
+echo "[test]" > "$test_file"
+echo "key=value" >> "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_backup_credentials 2>/dev/null && backup_exit=0 || backup_exit=$?
+backup_created=$(ls "${test_file}.bak."* 2>/dev/null | wc -l)
+if [[ $backup_exit -eq 0 ]] && [[ $backup_created -ge 1 ]]; then
+    backup_file=$(ls -t "${test_file}.bak."* 2>/dev/null | head -n 1)
+    if [[ "$backup_file" =~ \.bak\.[0-9]{8}-[0-9]{6}$ ]]; then
+        pass "awsprof_backup_credentials creates timestamped backup"
+    else
+        fail "awsprof_backup_credentials backup format incorrect: $backup_file"
+    fi
+else
+    fail "awsprof_backup_credentials did not create backup"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 10: Backup preserves file contents
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_backup_content.tmp"
+original_content="[default]
+aws_access_key_id=TEST123
+aws_secret_access_key=SECRET456"
+echo "$original_content" > "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_backup_credentials 2>/dev/null
+backup_file=$(ls -t "${test_file}.bak."* 2>/dev/null | head -n 1)
+backup_content=$(cat "$backup_file" 2>/dev/null)
+if [[ "$backup_content" == "$original_content" ]]; then
+    pass "awsprof_backup_credentials preserves file contents"
+else
+    fail "awsprof_backup_credentials backup content mismatch"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 11: Write section adds new section
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_write_add.tmp"
+echo "[existing]" > "$test_file"
+echo "key=value" >> "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_write_section "newsection" "aws_access_key_id=NEWKEY123" "aws_secret_access_key=NEWSECRET456" 2>/dev/null
+result=$(grep -A2 "^\[newsection\]" "$test_file" 2>/dev/null)
+if [[ "$result" == *"NEWKEY123"* ]] && [[ "$result" == *"NEWSECRET456"* ]]; then
+    pass "awsprof_ini_write_section adds new section"
+else
+    fail "awsprof_ini_write_section failed to add new section"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 12: Write section updates existing section
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_write_update.tmp"
+echo "[default]" > "$test_file"
+echo "aws_access_key_id=OLDKEY" >> "$test_file"
+echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_write_section "default" "aws_access_key_id=UPDATED123" "aws_secret_access_key=UPDATEDSECRET456" 2>/dev/null
+result=$(grep -A2 "^\[default\]" "$test_file" 2>/dev/null)
+if [[ "$result" == *"UPDATED123"* ]] && [[ "$result" == *"UPDATEDSECRET456"* ]] && [[ "$result" != *"OLDKEY"* ]]; then
+    pass "awsprof_ini_write_section updates existing section"
+else
+    fail "awsprof_ini_write_section failed to update section"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 13: Write section preserves other sections
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_write_preserve.tmp"
+echo "[section1]" > "$test_file"
+echo "key1=value1" >> "$test_file"
+echo "" >> "$test_file"
+echo "[section2]" >> "$test_file"
+echo "key2=value2" >> "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_write_section "section1" "key1=newvalue1" 2>/dev/null
+section2_preserved=$(grep -A1 "^\[section2\]" "$test_file" 2>/dev/null | grep "key2=value2")
+if [[ -n "$section2_preserved" ]]; then
+    pass "awsprof_ini_write_section preserves other sections"
+else
+    fail "awsprof_ini_write_section damaged other sections"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 14: Write section preserves comments
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_write_comments.tmp"
+echo "# Important comment" > "$test_file"
+echo "[default]" >> "$test_file"
+echo "key=value" >> "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_write_section "default" "key=newvalue" 2>/dev/null
+comment_preserved=$(grep "# Important comment" "$test_file" 2>/dev/null)
+if [[ -n "$comment_preserved" ]]; then
+    pass "awsprof_ini_write_section preserves comments"
+else
+    fail "awsprof_ini_write_section lost comments"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 15: Delete section removes target only
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_delete_section.tmp"
+echo "[section1]" > "$test_file"
+echo "key1=value1" >> "$test_file"
+echo "" >> "$test_file"
+echo "[section2]" >> "$test_file"
+echo "key2=value2" >> "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_delete_section "section1" 2>/dev/null
+section1_gone=$(grep "^\[section1\]" "$test_file" 2>/dev/null)
+section2_preserved=$(grep -A1 "^\[section2\]" "$test_file" 2>/dev/null | grep "key2=value2")
+if [[ -z "$section1_gone" ]] && [[ -n "$section2_preserved" ]]; then
+    pass "awsprof_ini_delete_section removes target section only"
+else
+    fail "awsprof_ini_delete_section incorrect deletion"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 16: Delete section preserves formatting
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_delete_formatting.tmp"
+echo "# Header comment" > "$test_file"
+echo "[section1]" >> "$test_file"
+echo "key1=value1" >> "$test_file"
+echo "" >> "$test_file"
+echo "# Section 2 comment" >> "$test_file"
+echo "[section2]" >> "$test_file"
+echo "key2=value2" >> "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_delete_section "section1" 2>/dev/null
+comment1_preserved=$(grep "# Header comment" "$test_file" 2>/dev/null)
+comment2_preserved=$(grep "# Section 2 comment" "$test_file" 2>/dev/null)
+if [[ -n "$comment1_preserved" ]] && [[ -n "$comment2_preserved" ]]; then
+    pass "awsprof_ini_delete_section preserves formatting"
+else
+    fail "awsprof_ini_delete_section lost formatting"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
+# Test 17: Atomic write sets chmod 600
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_chmod.tmp"
+echo "[test]" > "$test_file"
+chmod 644 "$test_file"
+export AWS_SHARED_CREDENTIALS_FILE="$test_file"
+awsprof_ini_write_section "test" "key=value" 2>/dev/null
+perms=$(stat -c "%a" "$test_file" 2>/dev/null || stat -f "%A" "$test_file" 2>/dev/null)
+if [[ "$perms" == "600" ]]; then
+    pass "awsprof_ini_write_section sets chmod 600"
+else
+    fail "awsprof_ini_write_section permissions incorrect: $perms"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset AWS_SHARED_CREDENTIALS_FILE
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"
