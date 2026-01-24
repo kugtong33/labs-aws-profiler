@@ -396,6 +396,172 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
+#=== EDIT COMMAND TESTS ===
+
+# Test 27: edit existing profile successfully
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit.tmp"
+echo "[testprofile]" > "$test_file"
+echo "aws_access_key_id=OLDKEY" >> "$test_file"
+echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit testprofile 2>&1) && exit_code=0 || exit_code=$?
+profile_exists=$(grep "^\[testprofile\]" "$test_file" 2>/dev/null)
+new_key=$(grep "aws_access_key_id=AKIAIOSFODNN7EXAMPLE" "$test_file" 2>/dev/null)
+old_key=$(grep "OLDKEY" "$test_file" 2>/dev/null)
+backup_count=$(ls "${test_file}.bak."* 2>/dev/null | wc -l)
+if [[ $exit_code -eq 0 ]] && [[ "$result" == *"updated successfully"* ]] && [[ -n "$profile_exists" ]] && [[ -n "$new_key" ]] && [[ -z "$old_key" ]] && [[ $backup_count -ge 1 ]]; then
+    pass "awsprof edit updates existing profile"
+else
+    fail "awsprof edit should update profile (exit=$exit_code, exists=$profile_exists, new_key=$new_key, old_key=$old_key, backups=$backup_count)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 28: edit non-existent profile rejection
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit_noexist.tmp"
+echo "[existing]" > "$test_file"
+echo "key=value" >> "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit nonexistent 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"not found"* ]]; then
+    pass "awsprof edit rejects non-existent profile"
+else
+    fail "awsprof edit should reject non-existent profile (exit=$exit_code)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 29: edit missing profile name parameter
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit_noparam.tmp"
+echo "[existing]" > "$test_file"
+result=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"required"* ]]; then
+    pass "awsprof edit requires profile name"
+else
+    fail "awsprof edit should require profile name (exit=$exit_code)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 30: edit with empty access key
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit_empty.tmp"
+echo "[emptykey]" > "$test_file"
+echo "aws_access_key_id=OLDKEY" >> "$test_file"
+echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
+result=$(echo -e "\nsecret" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit emptykey 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"required"* ]]; then
+    pass "awsprof edit rejects empty access key"
+else
+    fail "awsprof edit should reject empty access key (exit=$exit_code)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 31: edit with empty secret key
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit_empty2.tmp"
+echo "[emptysecret]" > "$test_file"
+echo "aws_access_key_id=OLDKEY" >> "$test_file"
+echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\n" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit emptysecret 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"required"* ]]; then
+    pass "awsprof edit rejects empty secret key"
+else
+    fail "awsprof edit should reject empty secret key (exit=$exit_code)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 32: edit preserves other profiles
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit_preserve.tmp"
+echo "[profile1]" > "$test_file"
+echo "aws_access_key_id=KEY1" >> "$test_file"
+echo "aws_secret_access_key=SECRET1" >> "$test_file"
+echo "" >> "$test_file"
+echo "[profile2]" >> "$test_file"
+echo "aws_access_key_id=KEY2" >> "$test_file"
+echo "aws_secret_access_key=SECRET2" >> "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit profile1 2>&1) && exit_code=0 || exit_code=$?
+profile1_exists=$(grep "^\[profile1\]" "$test_file" 2>/dev/null)
+profile2_exists=$(grep "^\[profile2\]" "$test_file" 2>/dev/null)
+profile2_key=$(grep -A1 "^\[profile2\]" "$test_file" 2>/dev/null | grep "KEY2")
+if [[ $exit_code -eq 0 ]] && [[ -n "$profile1_exists" ]] && [[ -n "$profile2_exists" ]] && [[ -n "$profile2_key" ]]; then
+    pass "awsprof edit preserves other profiles"
+else
+    fail "awsprof edit should preserve other profiles"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 33: edit sets chmod 600
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit_chmod.tmp"
+echo "[testprofile]" > "$test_file"
+echo "aws_access_key_id=OLDKEY" >> "$test_file"
+echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
+chmod 644 "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit testprofile 2>&1) && exit_code=0 || exit_code=$?
+perms=$(stat -c "%a" "$test_file" 2>/dev/null || stat -f "%A" "$test_file" 2>/dev/null)
+if [[ $exit_code -eq 0 ]] && [[ "$perms" == "600" ]]; then
+    pass "awsprof edit sets chmod 600"
+else
+    fail "awsprof edit should set chmod 600 (perms=$perms)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 34: edit never displays secret in output
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit_secret.tmp"
+echo "[testprofile]" > "$test_file"
+echo "aws_access_key_id=OLDKEY" >> "$test_file"
+echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
+secret="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\n$secret" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit testprofile 2>&1)
+if [[ "$result" != *"$secret"* ]]; then
+    pass "awsprof edit never displays secret"
+else
+    fail "awsprof edit displayed secret in output"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+
+# Test 35: integration - edit then list
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit_list.tmp"
+echo "[tolist]" > "$test_file"
+echo "aws_access_key_id=OLDKEY" >> "$test_file"
+echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
+echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit tolist 2>/dev/null
+list_result=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" list 2>/dev/null)
+if [[ "$list_result" == *"tolist"* ]]; then
+    pass "awsprof edit then list shows profile"
+else
+    fail "awsprof list should show edited profile"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+
+# Test 36: integration - edit then use
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_edit_use.tmp"
+echo "[touse]" > "$test_file"
+echo "aws_access_key_id=OLDKEY" >> "$test_file"
+echo "aws_secret_access_key=OLDSECRET" >> "$test_file"
+echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" edit touse 2>/dev/null
+(
+    eval "$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" use touse 2>/dev/null)"
+    [[ "$AWS_PROFILE" == "touse" ]] && exit 0 || exit 1
+) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 0 ]]; then
+    pass "awsprof edit then use switches to profile"
+else
+    fail "awsprof use should work with edited profile"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"
