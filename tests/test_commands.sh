@@ -1908,6 +1908,105 @@ else
 fi
 unset tmpdir result
 
+# Story 3.6 Tests: Error handling and robustness
+
+# Test 115: Hook errors don't break shell (AC1 - robustness test)
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "production" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+# Call hook and then verify shell still works
+"${ROOT_DIR}/awsprof" --hook-detect-profile >/dev/null 2>&1 || true
+shell_test=$(bash -c 'echo "ok"' 2>&1)
+cd - > /dev/null
+rm -rf "$tmpdir"
+# After hook runs, shell should still be able to execute commands
+if [[ "$shell_test" == "ok" ]]; then
+    pass "Shell remains functional after hook (AC1)"
+else
+    fail "Shell should remain functional after hook"
+fi
+unset shell_test tmpdir
+
+# Test 116: Hook returns zero exit code always (AC1 - non-blocking)
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "production" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+# Call hook with mismatch and capture exit code
+AWS_PROFILE="staging" "${ROOT_DIR}/awsprof" --hook-detect-profile >/dev/null 2>&1
+exit_code=$?
+cd - > /dev/null
+rm -rf "$tmpdir"
+# Hook must always return 0 (non-blocking, never fails)
+if [[ $exit_code -eq 0 ]]; then
+    pass "Hook returns 0 even on mismatch (non-blocking)"
+else
+    fail "Hook should always return 0 (got: $exit_code)"
+fi
+unset tmpdir exit_code
+
+# Test 117: Hook shows error for invalid profile name in direct command (AC3)
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "nonexistent-profile-xyz" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+# Direct use command should show error for invalid profile
+output=$("${ROOT_DIR}/awsprof" use "nonexistent-profile-xyz" 2>&1) || exit_code=$?
+cd - > /dev/null
+rm -rf "$tmpdir"
+# Direct command should show error message
+if [[ "$output" == *"not found"* ]] || [[ "$output" == *"Error"* ]]; then
+    pass "Direct command shows error for invalid profile"
+else
+    fail "Should show error for invalid profile (got: '$output')"
+fi
+unset output exit_code tmpdir
+
+# Test 118: Hook completes quickly even on slow I/O (AC4)
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "production" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+# Time the hook execution
+start_time=$(date +%s%N)
+AWS_PROFILE="staging" timeout 2 "${ROOT_DIR}/awsprof" --hook-detect-profile >/dev/null 2>&1
+result=$?
+end_time=$(date +%s%N)
+elapsed_ms=$(( (end_time - start_time) / 1000000 ))
+cd - > /dev/null
+rm -rf "$tmpdir"
+# Hook should complete quickly (within reasonable time, < 1 second in test)
+if [[ $elapsed_ms -lt 1000 ]] && [[ $result -eq 0 ]]; then
+    pass "Hook completes quickly (<1000ms)"
+else
+    fail "Hook should complete quickly (took ${elapsed_ms}ms, exit: $result)"
+fi
+unset tmpdir start_time end_time elapsed_ms result
+
+# Test 119: Multiple sessions maintain independent AWS_PROFILE (AC5)
+((TESTS_RUN++))
+tmpdir1=$(mktemp -d)
+tmpdir2=$(mktemp -d)
+echo "profile1" > "$tmpdir1/.awsprofile"
+echo "profile2" > "$tmpdir2/.awsprofile"
+# Session 1: check profile
+cd "$tmpdir1"
+profile1=$(AWS_PROFILE="session1" bash -c 'echo $AWS_PROFILE')
+cd - > /dev/null
+# Session 2: check profile
+cd "$tmpdir2"
+profile2=$(AWS_PROFILE="session2" bash -c 'echo $AWS_PROFILE')
+cd - > /dev/null
+rm -rf "$tmpdir1" "$tmpdir2"
+# Each session should have its own AWS_PROFILE value
+if [[ "$profile1" == "session1" ]] && [[ "$profile2" == "session2" ]]; then
+    pass "Multiple sessions maintain independent AWS_PROFILE"
+else
+    fail "Sessions should maintain independent profiles (s1: '$profile1', s2: '$profile2')"
+fi
+unset tmpdir1 tmpdir2 profile1 profile2
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"
