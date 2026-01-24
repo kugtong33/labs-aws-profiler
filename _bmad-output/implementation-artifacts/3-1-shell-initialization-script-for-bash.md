@@ -1,6 +1,6 @@
 # Story 3.1: Shell Initialization Script for Bash
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -344,7 +344,74 @@ Claude Haiku 4.5 (claude-haiku-4-5-20251001)
 - `awsprof` - Added init command and shell integration section (~55 lines)
 - `tests/test_commands.sh` - Added 10 new tests (~130 lines)
 
+### Code Review Findings & Fixes
+
+**Adversarial Code Review Results:** 6 total findings (2 CRITICAL, 3 MEDIUM, 1 LOW)
+
+#### 🔴 CRITICAL ISSUES - FIXED
+
+**Issue 1: Infinite Recursion in Wrapper Function**
+- **Root Cause**: Wrapper was calling `awsprof` instead of `command awsprof`
+- **Impact**: Core functionality broken - wrapper would hang when called
+- **Fix**: Changed wrapper definition from:
+  ```bash
+  eval "$(awsprof "$@")"  # WRONG - infinite recursion
+  ```
+  to:
+  ```bash
+  eval "$(command awsprof "$@")"  # CORRECT - calls actual executable
+  ```
+- **Test Coverage**: Added Test 80 to verify wrapper actually executes commands (was missing before)
+
+**Issue 2: Variable Substitution in Heredoc**
+- **Root Cause**: `$awsprof_path` variable was substituting at init time instead of remaining as code
+- **Impact**: Wrapper couldn't find awsprof, fell back to simple name (causing issue #1)
+- **Fix**: Removed unnecessary `awsprof_path` variable, simplified to use standard `command` pattern
+- **Verification**: `./awsprof init 2>&1 | grep "command awsprof"` confirms fix
+
+#### 🟡 MEDIUM ISSUES - FIXED
+
+**Issue 3: Test Suite Doesn't Verify Functional Correctness**
+- **Root Cause**: Tests only checked if wrapper function was defined, never called it
+- **Impact**: False confidence in test results (tests passed but functionality was broken)
+- **Fix**: Added Test 80 that actually calls wrapper: `awsprof list` through wrapper function
+- **Result**: Catches the infinite recursion bug immediately
+
+**Issue 4: AC3 Not Tested**
+- **Root Cause**: No test verified that profile switching actually works through wrapper
+- **Impact**: AC3 requirement not validated by tests
+- **Fix**: Added Test 81 that verifies `awsprof use profile-name` sets AWS_PROFILE in current shell
+- **Verification**: Test sources init code and calls wrapper with actual profile switching
+
+**Issue 5: Test Script Variable Substitution Broken**
+- **Root Cause**: Test scripts used single-quoted heredocs, preventing ROOT_DIR substitution
+- **Impact**: Tests failed to find awsprof binary in subshells
+- **Fix**: Changed heredocs from `<<'EOF'` to `<<EOF` and properly escaped bash variables
+- **Result**: Tests now run awsprof from correct path in subshells
+
+#### 🟢 LOW ISSUE - FIXED
+
+**Issue 6: No Input Validation on Init Command**
+- **Root Cause**: Init command didn't validate it takes no arguments
+- **Impact**: User could accidentally call `awsprof init extra-args` without error
+- **Fix**: Added validation in dispatch case: `if [[ -n "${2:-}" ]]; then error; fi`
+- **Verification**: Added Test 82 to verify init rejects extra arguments
+
+#### Test Suite Impact
+- **Before Code Review**: 79 tests (10 for Story 3.1, but 3 had gaps)
+- **After Code Review**: 82 tests (10 original + 3 new functional tests)
+- **Result**: All 82 tests passing, 0 regressions, wrapper functionality verified
+- **Coverage Improvements**:
+  - Test 80: Validates wrapper executes real commands
+  - Test 81: Validates AC3 (profile switching works in current shell)
+  - Test 82: Validates argument validation
+
+### Git Commits
+
+**Implementation Commit (original)**: `86ae24e` - feat: implement Story 3.1
+**Code Review Fixes Commit**: `3db9850` - fix: adversarial code review fixes for Story 3.1
+
 ### File List
 
-- `awsprof` - Main script (added `awsprof_cmd_init()`, `awsprof_hook_detect_profile()`, dispatch case, help text, ~55 lines total change)
-- `tests/test_commands.sh` - Test suite (added 10 comprehensive tests for init, ~130 lines)
+- `awsprof` - Main script (fixed wrapper function, added argument validation, ~12 lines changed from original)
+- `tests/test_commands.sh` - Test suite (fixed test scripts, added 3 new comprehensive tests, ~100 lines changed from original)
