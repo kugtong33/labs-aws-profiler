@@ -697,6 +697,59 @@ awsprof_cmd_import() {
     return 0
 }
 
+#=== SHELL INTEGRATION ===
+# awsprof_hook_detect_profile - Hook for PROMPT_COMMAND to detect profile mismatches
+# awsprof_cmd_init - Initialize shell integration
+
+awsprof_hook_detect_profile() {
+    # This is a stub for the detection hook that will be called from PROMPT_COMMAND
+    # Future stories (3.4-3.6) will implement the actual detection logic
+    # For now, this is just a placeholder that does nothing
+    :
+}
+
+# awsprof_cmd_init - Output bash shell initialization code
+awsprof_cmd_init() {
+    # Output shell code suitable for: eval "$(awsprof init)"
+    # This defines the wrapper function, detection hook, and sets up PROMPT_COMMAND
+    # Get the path to the actual awsprof executable for use in the wrapper
+    local awsprof_path
+    awsprof_path=$(command -v awsprof) || awsprof_path="awsprof"
+
+    cat <<INIT_SCRIPT
+# awsprof shell integration - source this in your ~/.bashrc
+# Usage: eval "\$(awsprof init)"
+
+# Define the detection hook function (stub for now, will be enhanced in future stories)
+awsprof_hook_detect_profile() {
+    # Stub function for PROMPT_COMMAND hook
+    # Future stories will implement:
+    # - Check for .awsprofile file in current directory
+    # - Compare expected profile vs current AWS_PROFILE
+    # - Display warnings and prompts if mismatch detected
+    :
+}
+
+# Define wrapper function that properly handles environment variables
+awsprof() {
+    eval "\$($awsprof_path "\$@")"
+}
+
+# Set up PROMPT_COMMAND hook for directory change detection
+if [[ -z "\$PROMPT_COMMAND" ]]; then
+    PROMPT_COMMAND='awsprof_hook_detect_profile'
+else
+    # Append to existing PROMPT_COMMAND without duplicating
+    if [[ "\$PROMPT_COMMAND" != *"awsprof_hook_detect_profile"* ]]; then
+        PROMPT_COMMAND="\${PROMPT_COMMAND%;};awsprof_hook_detect_profile"
+    fi
+fi
+
+INIT_SCRIPT
+
+    return 0
+}
+
 #=== MAIN DISPATCH ===
 # Main command dispatcher
 
@@ -731,6 +784,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             awsprof_cmd_import
             exit $?
             ;;
+        init)
+            awsprof_cmd_init
+            exit $?
+            ;;
         help|--help|-h|"")
             awsprof_msg "awsprof v${_awsprof_version}"
             awsprof_msg "Usage: awsprof <command>"
@@ -743,6 +800,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             awsprof_msg "  edit <profile>    Edit an existing AWS profile"
             awsprof_msg "  remove <profile>  Remove an AWS profile"
             awsprof_msg "  import            Import profiles from credentials file"
+            awsprof_msg "  init              Initialize shell integration (use with eval)"
             exit 0
             ;;
         *)

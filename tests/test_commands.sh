@@ -1124,6 +1124,148 @@ else
 fi
 unset exit_code
 
+# Test 70: Init command outputs valid bash syntax
+((TESTS_RUN++))
+init_output=$("${ROOT_DIR}/awsprof" init 2>/dev/null)
+if echo "$init_output" | bash -n 2>/dev/null; then
+    pass "awsprof init outputs valid bash syntax"
+else
+    fail "awsprof init should output valid bash syntax"
+fi
+unset init_output
+
+# Test 71: Output can be eval'd without errors
+((TESTS_RUN++))
+init_output=$("${ROOT_DIR}/awsprof" init 2>/dev/null)
+# Try to eval in a subshell - verify no errors occur
+eval_result=$(bash -c "eval \"\$1\"" -- "$init_output" 2>&1) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ $exit_code -eq 0 ]]; then
+    pass "awsprof init output can be eval'd without errors"
+else
+    fail "awsprof init output should eval without errors (error: $eval_result)"
+fi
+unset init_output exit_code eval_result
+
+# Test 72: Wrapper function is defined after eval
+((TESTS_RUN++))
+# Create a temporary shell script that sources init and checks for awsprof function
+test_script=$(mktemp)
+cat > "$test_script" <<EOF
+eval "\$("${ROOT_DIR}/awsprof" init)"
+if declare -f awsprof >/dev/null 2>&1; then
+    echo "function_exists"
+fi
+EOF
+result=$(bash "$test_script" 2>/dev/null)
+rm -f "$test_script"
+if [[ "$result" == "function_exists" ]]; then
+    pass "awsprof wrapper function is defined after eval"
+else
+    fail "awsprof wrapper function should be defined after eval (got: $result)"
+fi
+unset test_script result
+
+# Test 73: PROMPT_COMMAND is set after eval
+((TESTS_RUN++))
+test_script=$(mktemp)
+cat > "$test_script" <<EOF
+eval "\$("${ROOT_DIR}/awsprof" init)"
+if [[ -n "\$PROMPT_COMMAND" ]]; then
+    echo "hook_set"
+fi
+EOF
+result=$(bash "$test_script" 2>/dev/null)
+rm -f "$test_script"
+if [[ "$result" == "hook_set" ]]; then
+    pass "PROMPT_COMMAND is set after eval"
+else
+    fail "PROMPT_COMMAND should be set after eval"
+fi
+unset test_script result
+
+# Test 74: Wrapper function is callable after eval
+((TESTS_RUN++))
+test_script=$(mktemp)
+cat > "$test_script" <<EOF
+eval "\$("${ROOT_DIR}/awsprof" init)"
+# Test that wrapper function exists and is callable
+if type awsprof >/dev/null 2>&1; then
+    echo "function_callable"
+fi
+EOF
+result=$(bash "$test_script" 2>/dev/null)
+rm -f "$test_script"
+if [[ "$result" == "function_callable" ]]; then
+    pass "Wrapper function is callable after eval"
+else
+    fail "Wrapper function should be callable after eval"
+fi
+unset test_script result
+
+# Test 75: Init works when awsprof is in PATH
+((TESTS_RUN++))
+# awsprof should already be in PATH during test
+init_result=$("${ROOT_DIR}/awsprof" init 2>/dev/null)
+if [[ -n "$init_result" ]] && echo "$init_result" | grep -q "awsprof"; then
+    pass "init works when awsprof is in PATH"
+else
+    fail "init should output code when awsprof is in PATH"
+fi
+unset init_result
+
+# Test 76: Init outputs wrapper function definition
+((TESTS_RUN++))
+init_result=$("${ROOT_DIR}/awsprof" init 2>/dev/null)
+if [[ "$init_result" == *"awsprof()"* ]] || [[ "$init_result" == *"function awsprof"* ]]; then
+    pass "init outputs wrapper function definition"
+else
+    fail "init should output wrapper function definition"
+fi
+unset init_result
+
+# Test 77: Init includes PROMPT_COMMAND setup
+((TESTS_RUN++))
+init_result=$("${ROOT_DIR}/awsprof" init 2>/dev/null)
+if [[ "$init_result" == *"PROMPT_COMMAND"* ]]; then
+    pass "init includes PROMPT_COMMAND setup"
+else
+    fail "init should include PROMPT_COMMAND setup"
+fi
+unset init_result
+
+# Test 78: Init outputs to stdout (no stderr)
+((TESTS_RUN++))
+stdout_output=$("${ROOT_DIR}/awsprof" init 2>/dev/null)
+stderr_output=$("${ROOT_DIR}/awsprof" init 2>&1 >/dev/null)
+if [[ -n "$stdout_output" ]] && [[ -z "$stderr_output" ]]; then
+    pass "init outputs to stdout only"
+else
+    fail "init should output to stdout, not stderr"
+fi
+unset stdout_output stderr_output
+
+# Test 79: Shell remains functional after eval (basic sanity check)
+((TESTS_RUN++))
+test_script=$(mktemp)
+cat > "$test_script" <<'EOF'
+eval "$(awsprof init)"
+# Try basic shell operations after eval
+cd /tmp 2>/dev/null
+result=$(echo "test")
+if [[ "$result" == "test" ]]; then
+    echo "shell_ok"
+fi
+EOF
+result=$(bash "$test_script" 2>/dev/null)
+rm -f "$test_script"
+if [[ "$result" == "shell_ok" ]]; then
+    pass "Shell remains functional after eval"
+else
+    fail "Shell should remain functional after eval"
+fi
+unset test_script result
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"
