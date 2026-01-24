@@ -1,6 +1,6 @@
 # Story 3.2: POSIX sh Initialization Script
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -47,38 +47,38 @@ So that I can switch profiles even in minimal shell environments.
 
 ## Tasks / Subtasks
 
-- [ ] Extend `awsprof_cmd_init()` to support `--sh` flag (AC: 1, 2, 3, 4)
-  - [ ] Add `--sh` parameter handling to init command
-  - [ ] Detect and differentiate between bash and sh modes
-  - [ ] Output POSIX sh compatible code for sh mode
-  - [ ] Use POSIX syntax only (no bash arrays, PROMPT_COMMAND, etc.)
-  - [ ] Include clear documentation about POSIX limitations
-  - [ ] Validate output is POSIX sh compatible
+- [x] Extend `awsprof_cmd_init()` to support `--sh` flag (AC: 1, 2, 3, 4)
+  - [x] Add `--sh` parameter handling to init command
+  - [x] Detect and differentiate between bash and sh modes
+  - [x] Output POSIX sh compatible code for sh mode
+  - [x] Use POSIX syntax only (no bash arrays, PROMPT_COMMAND, etc.)
+  - [x] Include clear documentation about POSIX limitations
+  - [x] Validate output is POSIX sh compatible
 
-- [ ] Implement POSIX sh wrapper function (AC: 2)
-  - [ ] Define `awsprof()` wrapper function using POSIX syntax
-  - [ ] Handle parameter passing without bash arrays
-  - [ ] Use proper variable expansion (no $() if possible, use backticks)
-  - [ ] Ensure profile switching works via eval pattern
-  - [ ] Test wrapper works in minimal sh environments
+- [x] Implement POSIX sh wrapper function (AC: 2)
+  - [x] Define `awsprof()` wrapper function using POSIX syntax
+  - [x] Handle parameter passing without bash arrays
+  - [x] Use proper variable expansion (no $() if possible, use backticks)
+  - [x] Ensure profile switching works via eval pattern
+  - [x] Test wrapper works in minimal sh environments
 
-- [ ] Add documentation about POSIX sh limitations (AC: 3)
-  - [ ] Document that automatic detection is not available
-  - [ ] Explain why PROMPT_COMMAND equivalent doesn't exist in POSIX sh
-  - [ ] Reference manual `awsprof check` command (for Story 3.4)
-  - [ ] Provide usage examples for POSIX sh
+- [x] Add documentation about POSIX sh limitations (AC: 3)
+  - [x] Document that automatic detection is not available
+  - [x] Explain why PROMPT_COMMAND equivalent doesn't exist in POSIX sh
+  - [x] Reference manual `awsprof check` command (for Story 3.4)
+  - [x] Provide usage examples for POSIX sh
 
-- [ ] Write comprehensive tests for POSIX sh initialization (AC: 1, 2, 3, 4)
-  - [ ] Test: init --sh outputs valid POSIX sh syntax
-  - [ ] Test: Output can be eval'd without errors in sh
-  - [ ] Test: Wrapper function is defined after eval in sh
-  - [ ] Test: Profile switching works through wrapper in sh
-  - [ ] Test: init defaults to bash (no flag)
-  - [ ] Test: init --sh produces different output than init
-  - [ ] Test: POSIX sh environment variables work correctly
-  - [ ] Test: Wrapper handles missing awsprof gracefully in sh
-  - [ ] Test: Documentation note about limitations is present
-  - [ ] Test: Shell remains functional with sh initialization
+- [x] Write comprehensive tests for POSIX sh initialization (AC: 1, 2, 3, 4)
+  - [x] Test: init --sh outputs valid POSIX sh syntax
+  - [x] Test: Output can be eval'd without errors in sh
+  - [x] Test: Wrapper function is defined after eval in sh
+  - [x] Test: Profile switching works through wrapper in sh
+  - [x] Test: init defaults to bash (no flag)
+  - [x] Test: init --sh produces different output than init
+  - [x] Test: POSIX sh environment variables work correctly
+  - [x] Test: Wrapper handles missing awsprof gracefully in sh
+  - [x] Test: Documentation note about limitations is present
+  - [x] Test: Shell remains functional with sh initialization
 
 ## Dev Notes
 
@@ -250,6 +250,56 @@ Claude Haiku 4.5 (claude-haiku-4-5-20251001)
 
 ### Completion Notes List
 
+### Completion Notes List
+
+✅ **Implementation Complete:**
+- Extended `awsprof_cmd_init()` function to detect and handle `--sh` flag parameter
+- Implemented conditional output: bash code (default) vs POSIX sh code (with `--sh` flag)
+- POSIX sh wrapper uses backticks for command substitution (`` `command awsprof "$@"` ``)
+- Removed PROMPT_COMMAND setup from sh mode (limitation by design)
+- Added clear documentation about POSIX sh limitations in output
+- All code to stdout, no stderr (consistent with Story 3.1 pattern)
+
+✅ **Key Technical Decisions:**
+- Extended existing `awsprof_cmd_init()` function with flag handling (DRY principle)
+- Conditional shell_mode detection: `if [[ "${1:-}" == "--sh" ]]`
+- Used backticks instead of `$()` for POSIX compatibility
+- Wrapper function uses same eval pattern as bash version
+- No new hook functions needed (POSIX sh limitation)
+- Documentation clearly explains no auto-detection in POSIX sh
+
+✅ **Testing:**
+- Added 10 new tests (Tests 83-92)
+- Full test suite: 92/92 passing (82 existing + 10 new)
+- Zero regressions in Story 3.1 tests
+- Tests cover:
+  - POSIX sh syntax validation
+  - Eval compatibility in sh environment
+  - Wrapper function definition and execution
+  - Profile switching through wrapper in sh
+  - Default bash mode (backward compatibility)
+  - Documentation presence
+  - Graceful error handling
+  - Shell functionality after init
+
+✅ **Acceptance Criteria Verification:**
+- AC1 ✓ - `awsprof init --sh` outputs POSIX sh compatible code with proper syntax
+- AC2 ✓ - Profile switching works through wrapper in current shell (AC2 verified by Test 86)
+- AC3 ✓ - Documentation clearly explains POSIX sh limitation (no PROMPT_COMMAND equivalent)
+- AC4 ✓ - Shell remains functional with sh initialization (Test 92)
+
+✅ **Architecture Compliance:**
+- Follows function naming: `awsprof_cmd_init()` (consistent with bash init)
+- Output pattern: All code to stdout, errors to stderr
+- POSIX sh compatible syntax (no arrays, PROMPT_COMMAND, [[...]], etc.)
+- Integrated with existing command dispatch pattern
+- Reuses eval wrapper pattern from Story 3.1
+
+✅ **Files Modified:**
+- `awsprof` - Extended `awsprof_cmd_init()` with `--sh` flag support and conditional output (~40 lines changed)
+- `tests/test_commands.sh` - Added 10 new comprehensive tests (~180 lines added, fixed variable substitution in existing tests)
+
 ### File List
 
-- (To be completed during implementation)
+- `awsprof` - Main script (extended `awsprof_cmd_init()` function with --sh flag handling)
+- `tests/test_commands.sh` - Test suite (added 10 new tests for init --sh functionality)

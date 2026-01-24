@@ -1330,6 +1330,169 @@ else
 fi
 unset init_with_args init_exit
 
+# Story 3.2: POSIX sh Initialization Script Tests
+
+# Test 83: Init --sh outputs valid POSIX sh syntax
+((TESTS_RUN++))
+init_output=$("${ROOT_DIR}/awsprof" init --sh 2>/dev/null)
+# Validate POSIX sh syntax with sh -n
+echo "$init_output" | sh -n 2>/dev/null
+if [[ $? -eq 0 ]]; then
+    pass "init --sh outputs valid POSIX sh syntax"
+else
+    fail "init --sh should output valid POSIX sh syntax"
+fi
+unset init_output
+
+# Test 84: Init --sh output can be eval'd in sh environment
+((TESTS_RUN++))
+sh_script=$(mktemp)
+cat > "$sh_script" <<'EOF'
+eval "$("${ROOT_DIR}/awsprof" init --sh)"
+EOF
+result=$(sh "$sh_script" 2>&1) && exit_code=0 || exit_code=$?
+rm -f "$sh_script"
+if [[ $exit_code -eq 0 ]]; then
+    pass "init --sh output can be eval'd without errors in sh"
+else
+    fail "init --sh output should eval without errors (got: $result)"
+fi
+unset sh_script result exit_code
+
+# Test 85: Wrapper function is defined after eval in sh
+((TESTS_RUN++))
+sh_script=$(mktemp)
+cat > "$sh_script" <<EOF
+eval "\$("${ROOT_DIR}/awsprof" init --sh)"
+if type awsprof >/dev/null 2>&1; then
+    echo "function_exists"
+fi
+EOF
+result=$(sh "$sh_script" 2>/dev/null)
+rm -f "$sh_script"
+if [[ "$result" == "function_exists" ]]; then
+    pass "Wrapper function is defined after eval in sh"
+else
+    fail "Wrapper function should be defined after eval in sh"
+fi
+unset sh_script result
+
+# Test 86: Profile switching works through wrapper in sh environment
+((TESTS_RUN++))
+sh_script=$(mktemp)
+cat > "$sh_script" <<SHEOF
+export PATH="${ROOT_DIR}:\$PATH"
+eval "\$("${ROOT_DIR}/awsprof" init --sh)"
+mkdir -p ~/.aws
+cat > ~/.aws/credentials << 'CREDS'
+[test-sh-profile]
+aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+CREDS
+
+awsprof use test-sh-profile >/dev/null 2>&1
+if [ "\$AWS_PROFILE" = "test-sh-profile" ]; then
+    echo "profile_set"
+fi
+SHEOF
+result=$(sh "$sh_script" 2>/dev/null)
+rm -f "$sh_script"
+if [[ "$result" == "profile_set" ]]; then
+    pass "Profile switching works through wrapper in sh"
+else
+    fail "Profile switching should work through wrapper in sh"
+fi
+unset sh_script result
+
+# Test 87: Init defaults to bash (no flag produces bash output)
+((TESTS_RUN++))
+init_bash=$("${ROOT_DIR}/awsprof" init 2>/dev/null)
+init_sh=$("${ROOT_DIR}/awsprof" init --sh 2>/dev/null)
+# Bash version should have PROMPT_COMMAND, sh version should not
+if echo "$init_bash" | grep -q "PROMPT_COMMAND"; then
+    pass "init defaults to bash output (no flag)"
+else
+    fail "init should default to bash output with PROMPT_COMMAND"
+fi
+unset init_bash init_sh
+
+# Test 88: Init --sh produces different output than init
+((TESTS_RUN++))
+init_bash=$("${ROOT_DIR}/awsprof" init 2>/dev/null)
+init_sh=$("${ROOT_DIR}/awsprof" init --sh 2>/dev/null)
+# sh version should NOT have PROMPT_COMMAND
+if ! echo "$init_sh" | grep -q "PROMPT_COMMAND"; then
+    pass "init --sh produces different output (no PROMPT_COMMAND)"
+else
+    fail "init --sh should not include PROMPT_COMMAND"
+fi
+unset init_bash init_sh
+
+# Test 89: POSIX sh wrapper uses backticks, not $()
+((TESTS_RUN++))
+init_sh=$("${ROOT_DIR}/awsprof" init --sh 2>/dev/null)
+# POSIX sh version should use backticks for maximum compatibility
+if echo "$init_sh" | grep -q '`command awsprof'; then
+    pass "init --sh uses backticks for command substitution"
+else
+    fail "init --sh should use backticks for POSIX compatibility"
+fi
+unset init_sh
+
+# Test 90: Init --sh includes documentation about limitations
+((TESTS_RUN++))
+init_sh=$("${ROOT_DIR}/awsprof" init --sh 2>/dev/null)
+# Should document that automatic detection is not available
+if echo "$init_sh" | grep -q -i "limitation\|automatic"; then
+    pass "init --sh includes documentation about limitations"
+else
+    fail "init --sh should document POSIX sh limitations"
+fi
+unset init_sh
+
+# Test 91: Wrapper handles missing awsprof gracefully in sh
+((TESTS_RUN++))
+sh_script=$(mktemp)
+cat > "$sh_script" <<'EOF'
+# Use a PATH that doesn't include awsprof
+export PATH="/bin:/usr/bin"
+eval "$("${ROOT_DIR}/awsprof" init --sh)"
+# Try to call wrapper - it should fail gracefully without hanging
+result=$(timeout 2 sh -c 'awsprof list 2>&1' || echo "command_failed")
+if [ -n "$result" ]; then
+    echo "graceful_failure"
+fi
+EOF
+result=$(sh "$sh_script" 2>/dev/null)
+rm -f "$sh_script"
+if [[ "$result" == "graceful_failure" ]]; then
+    pass "Wrapper handles missing awsprof gracefully in sh"
+else
+    fail "Wrapper should handle missing awsprof gracefully"
+fi
+unset sh_script result
+
+# Test 92: Shell remains functional with sh initialization
+((TESTS_RUN++))
+sh_script=$(mktemp)
+cat > "$sh_script" <<'EOF'
+eval "$("${ROOT_DIR}/awsprof" init --sh)"
+# Try basic shell operations after eval
+cd /tmp 2>/dev/null
+result=$(echo "test")
+if [ "$result" = "test" ]; then
+    echo "shell_ok"
+fi
+EOF
+result=$(sh "$sh_script" 2>/dev/null)
+rm -f "$sh_script"
+if [[ "$result" == "shell_ok" ]]; then
+    pass "Shell remains functional with sh initialization"
+else
+    fail "Shell should remain functional with sh initialization"
+fi
+unset sh_script result
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"

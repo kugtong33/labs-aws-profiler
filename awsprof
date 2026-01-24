@@ -708,17 +708,24 @@ awsprof_hook_detect_profile() {
     :
 }
 
-# awsprof_cmd_init - Output bash shell initialization code
+# awsprof_cmd_init - Output bash or POSIX sh shell initialization code
 awsprof_cmd_init() {
-    # Validate no extra arguments provided
+    # Check for --sh flag to output POSIX sh compatible code
+    local shell_mode="bash"
+    if [[ "${1:-}" == "--sh" ]]; then
+        shell_mode="sh"
+        shift  # Remove --sh from arguments
+    fi
+
+    # Validate no extra arguments after flag processing
     if [[ $# -gt 0 ]]; then
         awsprof_error "init command takes no arguments"
         return 1
     fi
 
-    # Output shell code suitable for: eval "$(awsprof init)"
-    # This defines the wrapper function, detection hook, and sets up PROMPT_COMMAND
-    cat <<INIT_SCRIPT
+    # Output BASH shell code (default behavior)
+    if [[ "$shell_mode" == "bash" ]]; then
+        cat <<INIT_SCRIPT
 # awsprof shell integration - source this in your ~/.bashrc
 # Usage: eval "\$(awsprof init)"
 
@@ -749,6 +756,28 @@ else
 fi
 
 INIT_SCRIPT
+    fi
+
+    # Output POSIX SH compatible code
+    if [[ "$shell_mode" == "sh" ]]; then
+        cat <<'INIT_SCRIPT_SH'
+# awsprof shell integration for POSIX sh - source this in your ~/.profile
+# Usage: eval "$(awsprof init --sh)"
+
+# Define wrapper function that properly handles environment variables
+# Uses 'command awsprof' to find the actual executable, not the function
+# Note: POSIX sh uses backticks for maximum compatibility
+awsprof() {
+    eval "`command awsprof "$@"`"
+}
+
+# LIMITATION: Automatic profile detection is NOT available in POSIX sh
+# (POSIX sh lacks shell hooks available in bash - no event system)
+# To check your profile, run: awsprof check
+# Or manually verify with: echo $AWS_PROFILE
+
+INIT_SCRIPT_SH
+    fi
 
     return 0
 }
@@ -788,11 +817,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             exit $?
             ;;
         init)
-            if [[ -n "${2:-}" ]]; then
-                awsprof_error "init command takes no arguments"
-                exit 1
-            fi
-            awsprof_cmd_init
+            awsprof_cmd_init ${2:-}
             exit $?
             ;;
         help|--help|-h|"")

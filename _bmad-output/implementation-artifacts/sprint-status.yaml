@@ -57,7 +57,7 @@ development_status:
 
   epic-3: in-progress
   3-1-shell-initialization-script-for-bash: done
-  3-2-posix-sh-initialization-script: ready-for-dev
+  3-2-posix-sh-initialization-script: in-progress
   3-3-project-profile-file-creation: backlog
   3-4-directory-change-detection-and-profile-comparison: backlog
   3-5-interactive-profile-switch-prompt: backlog
