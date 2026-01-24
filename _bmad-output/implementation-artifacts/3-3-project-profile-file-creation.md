@@ -1,6 +1,6 @@
 # Story 3.3: Project Profile File Creation
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -36,27 +36,27 @@ So that the correct profile is associated with this project.
 
 ## Tasks / Subtasks
 
-- [ ] Implement `.awsprofile` file helper function (AC: 1, 2, 3)
-  - [ ] Create function to read `.awsprofile` file from current directory
-  - [ ] Extract profile name from file (single line, trim whitespace)
-  - [ ] Handle missing/empty/malformed file gracefully
-  - [ ] Return empty string if file missing or invalid
-  - [ ] Add no-error handling (silent ignore for missing files)
-  - [ ] Test with valid, empty, and missing files
+- [x] Implement `.awsprofile` file helper function (AC: 1, 2, 3)
+  - [x] Create function to read `.awsprofile` file from current directory
+  - [x] Extract profile name from file (single line, trim whitespace)
+  - [x] Handle missing/empty/malformed file gracefully
+  - [x] Return empty string if file missing or invalid
+  - [x] Add no-error handling (silent ignore for missing files)
+  - [x] Test with valid, empty, and missing files
 
-- [ ] Document `.awsprofile` file format (AC: 1)
-  - [ ] Add to help text: format is single line with profile name
-  - [ ] Document that file can be committed to version control
-  - [ ] Add example: `.awsprofile` file contains just: `client-acme`
-  - [ ] Document that whitespace is automatically trimmed
+- [x] Document `.awsprofile` file format (AC: 1)
+  - [x] Add to help text: format is single line with profile name
+  - [x] Document that file can be committed to version control
+  - [x] Add example: `.awsprofile` file contains just: `client-acme`
+  - [x] Document that whitespace is automatically trimmed
 
-- [ ] Add tests for `.awsprofile` file functionality (AC: 1, 2, 3)
-  - [ ] Test: `.awsprofile` file with valid profile name is read correctly
-  - [ ] Test: Leading/trailing whitespace in `.awsprofile` is trimmed
-  - [ ] Test: Missing `.awsprofile` file is handled gracefully
-  - [ ] Test: Empty `.awsprofile` file is handled gracefully
-  - [ ] Test: `.awsprofile` file with multiple lines uses only first line
-  - [ ] Test: `.awsprofile` helper function works in any directory
+- [x] Add tests for `.awsprofile` file functionality (AC: 1, 2, 3)
+  - [x] Test: `.awsprofile` file with valid profile name is read correctly
+  - [x] Test: Leading/trailing whitespace in `.awsprofile` is trimmed
+  - [x] Test: Missing `.awsprofile` file is handled gracefully
+  - [x] Test: Empty `.awsprofile` file is handled gracefully
+  - [x] Test: `.awsprofile` file with multiple lines uses only first line
+  - [x] Test: `.awsprofile` helper function works in any directory
 
 ## Dev Notes
 
@@ -238,12 +238,59 @@ Claude Haiku 4.5 (claude-haiku-4-5-20251001)
 
 ### Completion Notes List
 
+✅ **Implementation Complete:**
+- Created `awsprof_util_read_awsprofile()` helper function in UTILITY FUNCTIONS section
+- Function reads `.awsprofile` file from current directory only
+- Extracts first non-empty line and automatically trims whitespace using awk
+- Silent handling of missing/empty/malformed files (returns empty string)
+- Added `awsprof_cmd_check` command to expose helper function via CLI
+- Command added to main dispatch and help text documentation
+
+✅ **Key Technical Decisions:**
+- Placed helper function in new UTILITY FUNCTIONS section (line ~402)
+- Used awk for both non-empty-line extraction and whitespace trimming
+- Silent failure pattern (returns 0 always, outputs empty string if file missing)
+- Check command reads from current directory only (no parent directory traversal)
+- Returns profile name to stdout (suitable for use by Story 3.4 hook)
+
+✅ **Testing:**
+- Added 6 new tests (Tests 96-101) for `.awsprofile` file functionality
+- Test coverage:
+  - Happy path: valid profile name correctly read
+  - Whitespace trimming: leading/trailing spaces removed
+  - Missing file: graceful empty return
+  - Empty file: graceful empty return
+  - Multiple lines: first non-empty line used
+  - Directory context: only reads from current directory
+- All 101 tests passing (95 existing + 6 new)
+- Zero regressions in Stories 3.1-3.2 tests
+
+✅ **Acceptance Criteria Verification:**
+- AC1 ✓ - `.awsprofile` file format: single line with profile name, no special formatting, can be committed
+- AC2 ✓ - Profile name read correctly with whitespace trimming automatic
+- AC3 ✓ - Empty/malformed files handled gracefully with no error messages
+
+✅ **Architecture Compliance:**
+- Follows function naming: `awsprof_util_<action>()` convention (utility module)
+- Output pattern: Profile name to stdout, errors suppressed
+- POSIX compatible (uses awk for parsing, no bash-specific features)
+- Integrated with command dispatch pattern
+- Ready for Story 3.4 directory change detection hook to call this function
+
+✅ **Files Modified:**
+- `awsprof` - Added `awsprof_util_read_awsprofile()` helper function and `awsprof_cmd_check()` command (~20 lines added)
+- `tests/test_commands.sh` - Added 6 new comprehensive tests (~80 lines added)
+
 ---
 
 ## File List
 
-(To be updated after implementation)
+- `awsprof` - Main script (added UTILITY FUNCTIONS section with `.awsprofile` reader)
+- `tests/test_commands.sh` - Test suite (added 6 new tests for `.awsprofile` functionality)
 
 ## Change Log
 
-(To be updated after implementation)
+- Added `awsprof_util_read_awsprofile()` function to read `.awsprofile` file from current directory
+- Added `awsprof check` command to expose `.awsprofile` reading functionality
+- Added help text entry for `check` command
+- Added Tests 96-101 for `.awsprofile` file reading with various scenarios

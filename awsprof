@@ -398,6 +398,24 @@ awsprof_ini_delete_section() {
     return 0
 }
 
+#=== UTILITY FUNCTIONS ===
+# awsprof_util_read_awsprofile - Read .awsprofile file from current directory
+
+awsprof_util_read_awsprofile() {
+    local profile_file="./.awsprofile"
+
+    # Check if file exists
+    if [[ ! -f "$profile_file" ]]; then
+        return 0  # Return empty/success for missing file (silent failure)
+    fi
+
+    # Read first non-empty line, trim whitespace, and output to stdout
+    # Use awk to handle whitespace trimming and ignore empty lines
+    awk 'NF {print; exit}' "$profile_file" | awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}'
+
+    return 0
+}
+
 #=== PROFILE COMMANDS ===
 # awsprof_cmd_list - List available profiles
 # awsprof_cmd_use - Switch to a profile
@@ -697,6 +715,18 @@ awsprof_cmd_import() {
     return 0
 }
 
+# awsprof_cmd_check - Read and output .awsprofile file from current directory
+awsprof_cmd_check() {
+    local profile_name
+    profile_name=$(awsprof_util_read_awsprofile)
+
+    # Output the profile name (or empty string if not found)
+    # This outputs to stdout for use in tests and by shell integration
+    echo "$profile_name"
+
+    return 0
+}
+
 #=== SHELL INTEGRATION ===
 # awsprof_hook_detect_profile - Hook for PROMPT_COMMAND to detect profile mismatches
 # awsprof_cmd_init - Initialize shell integration
@@ -834,6 +864,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             awsprof_cmd_import
             exit $?
             ;;
+        check)
+            awsprof_cmd_check
+            exit $?
+            ;;
         init)
             awsprof_cmd_init ${2:-}
             exit $?
@@ -850,6 +884,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             awsprof_msg "  edit <profile>    Edit an existing AWS profile"
             awsprof_msg "  remove <profile>  Remove an AWS profile"
             awsprof_msg "  import            Import profiles from credentials file"
+            awsprof_msg "  check             Check .awsprofile file in current directory"
             awsprof_msg "  init              Initialize shell integration (use with eval)"
             exit 0
             ;;

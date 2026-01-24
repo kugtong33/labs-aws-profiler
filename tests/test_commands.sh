@@ -1576,6 +1576,108 @@ else
 fi
 unset sh_script result
 
+# Test 96: .awsprofile file with valid profile name is read correctly
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "client-acme" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+result=$("${ROOT_DIR}/awsprof" check 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ "$result" == "client-acme" ]]; then
+    pass ".awsprofile file with valid profile name is read correctly"
+else
+    fail ".awsprofile should return profile name (got: '$result')"
+fi
+unset result exit_code tmpdir
+
+# Test 97: Leading/trailing whitespace in .awsprofile is trimmed
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "  staging-profile  " > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+result=$("${ROOT_DIR}/awsprof" check 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ "$result" == "staging-profile" ]]; then
+    pass "Leading/trailing whitespace in .awsprofile is trimmed"
+else
+    fail ".awsprofile should trim whitespace (got: '$result')"
+fi
+unset result exit_code tmpdir
+
+# Test 98: Missing .awsprofile file is handled gracefully
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+cd "$tmpdir"
+result=$("${ROOT_DIR}/awsprof" check 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ -z "$result" ]]; then
+    pass "Missing .awsprofile file is handled gracefully"
+else
+    fail "Missing .awsprofile should return empty (got: '$result')"
+fi
+unset result exit_code tmpdir
+
+# Test 99: Empty .awsprofile file is handled gracefully
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+touch "$tmpdir/.awsprofile"
+cd "$tmpdir"
+result=$("${ROOT_DIR}/awsprof" check 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ -z "$result" ]]; then
+    pass "Empty .awsprofile file is handled gracefully"
+else
+    fail "Empty .awsprofile should return empty (got: '$result')"
+fi
+unset result exit_code tmpdir
+
+# Test 100: .awsprofile file with multiple lines uses only first non-empty line
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+cat > "$tmpdir/.awsprofile" <<'EOF'
+production-profile
+staging-profile
+dev-profile
+EOF
+cd "$tmpdir"
+result=$("${ROOT_DIR}/awsprof" check 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ "$result" == "production-profile" ]]; then
+    pass ".awsprofile with multiple lines uses only first line"
+else
+    fail ".awsprofile should use first line (got: '$result')"
+fi
+unset result exit_code tmpdir
+
+# Test 101: .awsprofile helper function works in any directory
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+subdir="$tmpdir/subproject"
+mkdir -p "$subdir"
+echo "test-profile" > "$tmpdir/.awsprofile"
+cd "$subdir"
+result=$("${ROOT_DIR}/awsprof" check 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+# Should be empty because .awsprofile is in parent dir, not current dir
+if [[ -z "$result" ]]; then
+    pass ".awsprofile helper function checks current directory only"
+else
+    fail ".awsprofile should check current directory only (got: '$result')"
+fi
+unset result exit_code tmpdir subdir
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"
