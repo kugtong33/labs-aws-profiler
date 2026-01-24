@@ -248,6 +248,154 @@ else
 fi
 unset exit_code
 
+#=== ADD COMMAND TESTS ===
+
+# Test 17: add new profile successfully
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_add.tmp"
+echo "[existing]" > "$test_file"
+echo "aws_access_key_id=EXISTINGKEY" >> "$test_file"
+echo "aws_secret_access_key=EXISTINGSECRET" >> "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add newprofile 2>&1) && exit_code=0 || exit_code=$?
+profile_exists=$(grep "^\[newprofile\]" "$test_file" 2>/dev/null)
+backup_count=$(ls "${test_file}.bak."* 2>/dev/null | wc -l)
+if [[ $exit_code -eq 0 ]] && [[ "$result" == *"added successfully"* ]] && [[ -n "$profile_exists" ]] && [[ $backup_count -ge 1 ]]; then
+    pass "awsprof add creates new profile"
+else
+    fail "awsprof add should create new profile (exit=$exit_code, exists=$profile_exists, backups=$backup_count)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 18: add duplicate profile rejection
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_add_dup.tmp"
+echo "[duplicate]" > "$test_file"
+echo "key=value" >> "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add duplicate 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"already exists"* ]]; then
+    pass "awsprof add rejects duplicate profile"
+else
+    fail "awsprof add should reject duplicate (exit=$exit_code)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 19: add missing profile name parameter
+((TESTS_RUN++))
+result=$(AWS_SHARED_CREDENTIALS_FILE="/tmp/test.tmp" "${ROOT_DIR}/awsprof" add 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"required"* ]]; then
+    pass "awsprof add requires profile name"
+else
+    fail "awsprof add should require profile name (exit=$exit_code)"
+fi
+unset exit_code
+
+# Test 20: add with empty access key
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_add_empty.tmp"
+echo "[test]" > "$test_file"
+result=$(echo -e "\nsecret" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add emptykey 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"required"* ]]; then
+    pass "awsprof add rejects empty access key"
+else
+    fail "awsprof add should reject empty access key (exit=$exit_code)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 21: add with empty secret key
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_add_empty2.tmp"
+echo "[test]" > "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\n" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add emptysecret 2>&1) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$result" == *"required"* ]]; then
+    pass "awsprof add rejects empty secret key"
+else
+    fail "awsprof add should reject empty secret key (exit=$exit_code)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 22: add preserves existing profiles
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_add_preserve.tmp"
+echo "[profile1]" > "$test_file"
+echo "key1=value1" >> "$test_file"
+echo "" >> "$test_file"
+echo "[profile2]" >> "$test_file"
+echo "key2=value2" >> "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add newprofile 2>&1) && exit_code=0 || exit_code=$?
+profile1_exists=$(grep "^\[profile1\]" "$test_file" 2>/dev/null)
+profile2_exists=$(grep "^\[profile2\]" "$test_file" 2>/dev/null)
+if [[ $exit_code -eq 0 ]] && [[ -n "$profile1_exists" ]] && [[ -n "$profile2_exists" ]]; then
+    pass "awsprof add preserves existing profiles"
+else
+    fail "awsprof add should preserve existing profiles"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 23: add sets chmod 600
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_add_chmod.tmp"
+echo "[test]" > "$test_file"
+chmod 644 "$test_file"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add newprofile 2>&1) && exit_code=0 || exit_code=$?
+perms=$(stat -c "%a" "$test_file" 2>/dev/null || stat -f "%A" "$test_file" 2>/dev/null)
+if [[ $exit_code -eq 0 ]] && [[ "$perms" == "600" ]]; then
+    pass "awsprof add sets chmod 600"
+else
+    fail "awsprof add should set chmod 600 (perms=$perms)"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 24: add never displays secret in output
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_add_secret.tmp"
+echo "[test]" > "$test_file"
+secret="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+result=$(echo -e "AKIAIOSFODNN7EXAMPLE\n$secret" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add secrettest 2>&1)
+if [[ "$result" != *"$secret"* ]]; then
+    pass "awsprof add never displays secret"
+else
+    fail "awsprof add displayed secret in output"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+
+# Test 25: integration - add then list
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_add_list.tmp"
+echo "[existing]" > "$test_file"
+echo "key=value" >> "$test_file"
+echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add integration-test 2>/dev/null
+list_result=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" list 2>/dev/null)
+if [[ "$list_result" == *"integration-test"* ]]; then
+    pass "awsprof add then list shows new profile"
+else
+    fail "awsprof list should show added profile"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+
+# Test 26: integration - add then use
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_add_use.tmp"
+echo "[existing]" > "$test_file"
+echo "key=value" >> "$test_file"
+echo -e "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG" | AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" add switch-test 2>/dev/null
+(
+    eval "$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" use switch-test 2>/dev/null)"
+    [[ "$AWS_PROFILE" == "switch-test" ]] && exit 0 || exit 1
+) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 0 ]]; then
+    pass "awsprof add then use switches to new profile"
+else
+    fail "awsprof use should work with added profile"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"

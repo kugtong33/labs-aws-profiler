@@ -49,7 +49,7 @@ development_status:
 
   epic-2: in-progress
   2-1-ini-file-writing-backup-safety: review
-  2-2-add-new-profile: backlog
+  2-2-add-new-profile: review
   2-3-edit-existing-profile: backlog
   2-4-remove-profile: backlog
   2-5-import-existing-profiles: backlog
