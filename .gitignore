@@ -1,3 +1,7 @@
 .agentvibes
 .claude
 .mcp.json
+
+# Generated test fixtures and backups
+tests/fixtures/*.bak*
+tests/fixtures/*.tmp*
