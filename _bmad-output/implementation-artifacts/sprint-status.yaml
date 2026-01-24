@@ -51,7 +51,7 @@ development_status:
   2-1-ini-file-writing-backup-safety: review
   2-2-add-new-profile: review
   2-3-edit-existing-profile: done
-  2-4-remove-profile: backlog
+  2-4-remove-profile: review
   2-5-import-existing-profiles: backlog
   epic-2-retrospective: optional
 

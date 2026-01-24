@@ -337,6 +337,8 @@ awsprof_ini_delete_section() {
 # awsprof_cmd_use - Switch to a profile
 # awsprof_cmd_whoami - Show current profile
 # awsprof_cmd_add - Add a new profile
+# awsprof_cmd_edit - Edit an existing profile
+# awsprof_cmd_remove - Remove an existing profile
 
 awsprof_cmd_list() {
     local profiles
@@ -495,6 +497,37 @@ awsprof_cmd_edit() {
     return 0
 }
 
+# awsprof_cmd_remove - Remove an existing profile
+awsprof_cmd_remove() {
+    local profile_name="$1"
+
+    # Validate profile name provided
+    if [[ -z "$profile_name" ]]; then
+        awsprof_error "Profile name required"
+        awsprof_msg "Usage: awsprof remove <profile-name>"
+        return 1
+    fi
+
+    # Check if profile exists
+    local profiles
+    profiles=$(awsprof_ini_list_sections 2>/dev/null) || profiles=""
+    if ! echo "$profiles" | grep -qx "$profile_name"; then
+        awsprof_error "Profile '$profile_name' not found"
+        return 1
+    fi
+
+    # Delete the profile using Story 2.1 function
+    if ! awsprof_ini_delete_section "$profile_name"; then
+        awsprof_error "Failed to remove profile"
+        return 1
+    fi
+
+    # Success message
+    awsprof_success "Profile '$profile_name' removed successfully"
+
+    return 0
+}
+
 #=== MAIN DISPATCH ===
 # Main command dispatcher
 
@@ -521,6 +554,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             awsprof_cmd_edit "${2:-}"
             exit $?
             ;;
+        remove)
+            awsprof_cmd_remove "${2:-}"
+            exit $?
+            ;;
         help|--help|-h|"")
             awsprof_msg "awsprof v${_awsprof_version}"
             awsprof_msg "Usage: awsprof <command>"
@@ -531,6 +568,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             awsprof_msg "  whoami            Show currently active profile"
             awsprof_msg "  add <profile>     Add a new AWS profile"
             awsprof_msg "  edit <profile>    Edit an existing AWS profile"
+            awsprof_msg "  remove <profile>  Remove an AWS profile"
             exit 0
             ;;
         *)

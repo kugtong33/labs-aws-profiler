@@ -562,6 +562,181 @@ fi
 rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 
+# ===== REMOVE COMMAND TESTS (Story 2.4) =====
+
+# Test 37: Remove existing profile successfully
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
+echo "[keep-this]" > "$test_file"
+echo "aws_access_key_id=KEEP123" >> "$test_file"
+echo "aws_secret_access_key=KEEPSECRET456" >> "$test_file"
+echo "[remove-me]" >> "$test_file"
+echo "aws_access_key_id=DELETE123" >> "$test_file"
+echo "aws_secret_access_key=DELETESECRET456" >> "$test_file"
+stderr_file=$(mktemp)
+AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove remove-me 2>"$stderr_file" || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+exit_code=${exit_code:-0}
+# Check removal succeeded
+if [[ $exit_code -eq 0 ]] && [[ "$stderr" == *"removed successfully"* ]] && ! grep -q "^\[remove-me\]" "$test_file" && grep -q "^\[keep-this\]" "$test_file"; then
+    pass "awsprof remove deletes target profile"
+else
+    fail "awsprof remove should delete target profile"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+unset stderr
+
+# Test 38: Non-existent profile rejection
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
+echo "[exists]" > "$test_file"
+echo "aws_access_key_id=KEY123" >> "$test_file"
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove nonexistent 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$stderr" == *"not found"* ]]; then
+    pass "awsprof remove rejects non-existent profile"
+else
+    fail "awsprof remove should reject non-existent profile"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+unset stderr
+
+# Test 39: Missing profile name parameter
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
+echo "[test]" > "$test_file"
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$stderr" == *"required"* ]]; then
+    pass "awsprof remove requires profile name"
+else
+    fail "awsprof remove should require profile name"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+unset stderr
+
+# Test 40: Remove only profile (empty file result)
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
+echo "[only-profile]" > "$test_file"
+echo "aws_access_key_id=ONLY123" >> "$test_file"
+echo "aws_secret_access_key=ONLYSECRET456" >> "$test_file"
+AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove only-profile >/dev/null 2>&1 || exit_code=$?
+exit_code=${exit_code:-0}
+# Check file exists but is empty (or only comments)
+if [[ $exit_code -eq 0 ]] && [[ -f "$test_file" ]] && ! grep -q "^\[" "$test_file"; then
+    pass "awsprof remove handles removing only profile"
+else
+    fail "awsprof remove should leave empty file when removing only profile"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 41: Other profiles preserved after deletion
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
+echo "[profile1]" > "$test_file"
+echo "aws_access_key_id=KEY1" >> "$test_file"
+echo "[profile2]" >> "$test_file"
+echo "aws_access_key_id=KEY2" >> "$test_file"
+echo "[profile3]" >> "$test_file"
+echo "aws_access_key_id=KEY3" >> "$test_file"
+AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove profile2 >/dev/null 2>&1 || exit_code=$?
+exit_code=${exit_code:-0}
+# Check profile2 removed but others remain
+if [[ $exit_code -eq 0 ]] && ! grep -q "^\[profile2\]" "$test_file" && grep -q "^\[profile1\]" "$test_file" && grep -q "^\[profile3\]" "$test_file"; then
+    pass "awsprof remove preserves other profiles"
+else
+    fail "awsprof remove should preserve other profiles"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 42: Backup created before deletion
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
+echo "[remove-me]" > "$test_file"
+echo "aws_access_key_id=DELETE123" >> "$test_file"
+AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove remove-me >/dev/null 2>&1 || exit_code=$?
+exit_code=${exit_code:-0}
+backup_count=$(ls "${test_file}.bak."* 2>/dev/null | wc -l)
+if [[ $exit_code -eq 0 ]] && [[ $backup_count -ge 1 ]]; then
+    pass "awsprof remove creates backup before deletion"
+else
+    fail "awsprof remove should create backup"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+
+# Test 43: chmod 600 maintained on credentials file
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
+echo "[remove-me]" > "$test_file"
+echo "aws_access_key_id=DELETE123" >> "$test_file"
+chmod 600 "$test_file"
+AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove remove-me >/dev/null 2>&1 || exit_code=$?
+exit_code=${exit_code:-0}
+perms=$(stat -c %a "$test_file" 2>/dev/null || stat -f %OLp "$test_file" | grep -o '..$')
+if [[ $exit_code -eq 0 ]] && [[ "$perms" == "600" || "$perms" == "rw-------" ]]; then
+    pass "awsprof remove maintains chmod 600"
+else
+    fail "awsprof remove should maintain chmod 600"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+unset perms
+
+# Test 44: Integration - remove then list
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
+echo "[profile1]" > "$test_file"
+echo "aws_access_key_id=KEY1" >> "$test_file"
+echo "[profile2]" >> "$test_file"
+echo "aws_access_key_id=KEY2" >> "$test_file"
+AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove profile1 >/dev/null 2>&1 || exit_code=$?
+exit_code=${exit_code:-0}
+list_output=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" list 2>/dev/null)
+if [[ $exit_code -eq 0 ]] && [[ ! "$list_output" == *"profile1"* ]] && [[ "$list_output" == *"profile2"* ]]; then
+    pass "awsprof remove then list shows updated profiles"
+else
+    fail "awsprof list should reflect removed profile"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+unset list_output
+
+# Test 45: Integration - remove then attempt to use deleted profile
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
+echo "[deleted-profile]" > "$test_file"
+echo "aws_access_key_id=DELETE123" >> "$test_file"
+AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove deleted-profile >/dev/null 2>&1
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" use deleted-profile 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$stderr" == *"not found"* ]]; then
+    pass "awsprof use fails on removed profile"
+else
+    fail "awsprof use should fail on removed profile"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+unset stderr
+
+# Test 46: Error messages format and exit codes
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_remove.tmp"
+echo "[test]" > "$test_file"
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" remove nonexistent 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+if [[ $exit_code -eq 1 ]] && [[ "$stderr" == "Error: "* ]]; then
+    pass "awsprof remove error messages properly formatted"
+else
+    fail "awsprof remove should format error messages correctly"
+fi
+rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
+unset exit_code
+unset stderr
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"
