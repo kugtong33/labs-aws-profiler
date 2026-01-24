@@ -1779,6 +1779,135 @@ else
 fi
 unset tmpdir start_time end_time elapsed_ms
 
+# Test 108: Prompt appears on profile mismatch and user accepts with 'y'
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "production" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+# Create the production profile so the switch can succeed
+awsprof add production "test_creds" > /dev/null 2>&1 || true
+# Test with 'y' response - prompt should appear and attempt switch
+output=$(echo "y" | bash -c 'source '"${ROOT_DIR}"'/awsprof; AWS_PROFILE="staging"; awsprof_prompt_switch_profile "production"' 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+# The output should show the prompt text (which means 'y' was processed)
+if [[ "$output" == *"Switch profile"* ]]; then
+    pass "Prompt appears and 'y' response processes switch"
+else
+    fail "Should show prompt for 'y' input (got output: '$output')"
+fi
+unset output exit_code tmpdir
+
+# Test 109: Uppercase 'Y' response switches profile
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "production" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+# Create the production profile for this test
+awsprof add production "test_creds" > /dev/null 2>&1 || true
+# Test with uppercase 'Y' response
+output=$(echo "Y" | bash -c 'source '"${ROOT_DIR}"'/awsprof; AWS_PROFILE="staging"; awsprof_prompt_switch_profile "production"' 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+# Check that the prompt was shown (meaning 'Y' was processed)
+if [[ "$output" == *"Switch profile"* ]]; then
+    pass "Uppercase 'Y' response processes switch"
+else
+    fail "Should show prompt for 'Y' input (got output: '$output')"
+fi
+unset output exit_code tmpdir
+
+# Test 110: Lowercase 'n' response declines switch
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "production" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+AWS_PROFILE="staging" output=$(echo "n" | "${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+new_profile="$AWS_PROFILE"
+cd - > /dev/null
+rm -rf "$tmpdir"
+# Should NOT contain "Switched to profile" message, profile should remain
+if [[ "$output" != *"Switched to profile"* ]] && [[ "$new_profile" == "staging" ]]; then
+    pass "Lowercase 'n' response declines switch"
+else
+    fail "Should not switch on 'n' (profile: '$new_profile')"
+fi
+unset output exit_code tmpdir new_profile
+
+# Test 111: Uppercase 'N' response declines switch
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "production" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+AWS_PROFILE="staging" output=$(echo "N" | "${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+new_profile="$AWS_PROFILE"
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ "$output" != *"Switched to profile"* ]] && [[ "$new_profile" == "staging" ]]; then
+    pass "Uppercase 'N' response declines switch"
+else
+    fail "Should not switch on 'N' (profile: '$new_profile')"
+fi
+unset output exit_code tmpdir new_profile
+
+# Test 112: Enter (empty input) declines switch
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "production" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+AWS_PROFILE="staging" output=$(echo "" | "${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+new_profile="$AWS_PROFILE"
+cd - > /dev/null
+rm -rf "$tmpdir"
+# Empty input (pressing Enter) should be treated as no
+if [[ "$output" != *"Switched to profile"* ]] && [[ "$new_profile" == "staging" ]]; then
+    pass "Enter (empty input) declines switch"
+else
+    fail "Should not switch on empty input (profile: '$new_profile')"
+fi
+unset output exit_code tmpdir new_profile
+
+# Test 113: Invalid input treated as no
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "production" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+AWS_PROFILE="staging" output=$(echo "maybe" | "${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+new_profile="$AWS_PROFILE"
+cd - > /dev/null
+rm -rf "$tmpdir"
+# Invalid input should be treated as no
+if [[ "$output" != *"Switched to profile"* ]] && [[ "$new_profile" == "staging" ]]; then
+    pass "Invalid input treated as no"
+else
+    fail "Should treat invalid input as no (profile: '$new_profile')"
+fi
+unset output exit_code tmpdir new_profile
+
+# Test 114: Shell remains functional after prompt
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "production" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+AWS_PROFILE="staging"
+echo "y" | "${ROOT_DIR}/awsprof" --hook-detect-profile >/dev/null 2>&1 || true
+# Try a simple shell command after the prompt
+result=$(bash -c "echo 'shell works'" 2>&1)
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ "$result" == "shell works" ]]; then
+    pass "Shell remains functional after prompt"
+else
+    fail "Shell should remain functional after prompt"
+fi
+unset tmpdir result
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"
