@@ -732,10 +732,33 @@ awsprof_cmd_check() {
 # awsprof_cmd_init - Initialize shell integration
 
 awsprof_hook_detect_profile() {
-    # This is a stub for the detection hook that will be called from PROMPT_COMMAND
-    # Future stories (3.4-3.6) will implement the actual detection logic
-    # For now, this is just a placeholder that does nothing
-    :
+    # Directory change detection hook for PROMPT_COMMAND
+    # Checks for .awsprofile file and warns if profile mismatch detected
+    # Must complete quickly (under 10ms) and not affect shell performance
+
+    # Get expected profile from .awsprofile file (from Story 3.3 helper)
+    local expected_profile
+    expected_profile=$(awsprof_util_read_awsprofile 2>/dev/null) || expected_profile=""
+
+    # If no .awsprofile file, exit silently (no project expectation)
+    if [[ -z "$expected_profile" ]]; then
+        return 0
+    fi
+
+    # Get current AWS_PROFILE (default to "(none)" if unset)
+    local current_profile="${AWS_PROFILE:-(none)}"
+
+    # Compare profiles
+    if [[ "$expected_profile" == "$current_profile" ]]; then
+        # Profiles match - silent success (no output)
+        return 0
+    fi
+
+    # Profiles mismatch - display warning message
+    # Use emoji for visibility, show both current and expected
+    awsprof_msg "⚠️  Profile mismatch: current '$current_profile', project expects '$expected_profile'"
+
+    return 0
 }
 
 # awsprof_cmd_init - Output bash or POSIX sh shell initialization code
@@ -866,6 +889,11 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             ;;
         check)
             awsprof_cmd_check
+            exit $?
+            ;;
+        --hook-detect-profile)
+            # Internal hook for testing/PROMPT_COMMAND
+            awsprof_hook_detect_profile
             exit $?
             ;;
         init)

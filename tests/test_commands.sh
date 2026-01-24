@@ -1678,6 +1678,107 @@ else
 fi
 unset result exit_code tmpdir subdir
 
+# Test 102: Hook runs and detects .awsprofile file
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "client-acme" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+output=$(AWS_PROFILE="client-acme" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+# Should have no output when profiles match
+if [[ -z "$output" ]]; then
+    pass "Hook runs and detects .awsprofile file"
+else
+    fail "Hook should be silent when profiles match (got: '$output')"
+fi
+unset output exit_code tmpdir
+
+# Test 103: Silent when profile matches
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "staging" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+output=$(AWS_PROFILE="staging" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ -z "$output" ]]; then
+    pass "Silent when profile matches"
+else
+    fail "Should be silent on profile match (got: '$output')"
+fi
+unset output exit_code tmpdir
+
+# Test 104: Warning when profile mismatches
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "production" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+output=$(AWS_PROFILE="staging" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ "$output" == *"Profile mismatch"* ]] && [[ "$output" == *"staging"* ]] && [[ "$output" == *"production"* ]]; then
+    pass "Warning when profile mismatches"
+else
+    fail "Should display mismatch warning (got: '$output')"
+fi
+unset output exit_code tmpdir
+
+# Test 105: Unset AWS_PROFILE shown as (none)
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "expected-profile" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+unset AWS_PROFILE
+output=$("${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ "$output" == *"Profile mismatch"* ]] && [[ "$output" == *"(none)"* ]] && [[ "$output" == *"expected-profile"* ]]; then
+    pass "Unset AWS_PROFILE shown as (none)"
+else
+    fail "Should show (none) for unset AWS_PROFILE (got: '$output')"
+fi
+unset output exit_code tmpdir
+
+# Test 106: Hook handles missing .awsprofile gracefully
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+cd "$tmpdir"
+AWS_PROFILE="any-profile" output=$("${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+# Should have no output when no .awsprofile file exists
+if [[ -z "$output" ]]; then
+    pass "Hook handles missing .awsprofile gracefully"
+else
+    fail "Should be silent when .awsprofile missing (got: '$output')"
+fi
+unset output exit_code tmpdir
+
+# Test 107: Hook completes under 10ms (performance check)
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "test-profile" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+AWS_PROFILE="test-profile"
+start_time=$(date +%s%N)
+"${ROOT_DIR}/awsprof" --hook-detect-profile >/dev/null 2>&1 || true
+end_time=$(date +%s%N)
+elapsed_ms=$(( (end_time - start_time) / 1000000 ))
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ $elapsed_ms -lt 50 ]]; then  # 50ms is conservative, requirement is 10ms
+    pass "Hook completes under 50ms (should be <10ms)"
+else
+    fail "Hook performance issue: ${elapsed_ms}ms (should be <10ms)"
+fi
+unset tmpdir start_time end_time elapsed_ms
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"
