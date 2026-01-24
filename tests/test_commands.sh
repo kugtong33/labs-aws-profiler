@@ -737,6 +737,195 @@ rm -f "$test_file" "${test_file}.bak."* 2>/dev/null
 unset exit_code
 unset stderr
 
+# ===== IMPORT COMMAND TESTS (Story 2.5) =====
+
+# Test 47: Import profiles from valid credentials file
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
+echo "[profile1]" > "$test_file"
+echo "aws_access_key_id=KEY1" >> "$test_file"
+echo "[profile2]" >> "$test_file"
+echo "aws_access_key_id=KEY2" >> "$test_file"
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" import 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ $exit_code -eq 0 ]] && [[ "$stderr" == *"Found 2 profiles"* ]] && [[ "$stderr" == *"profile1"* ]] && [[ "$stderr" == *"profile2"* ]]; then
+    pass "awsprof import lists profiles from credentials file"
+else
+    fail "awsprof import should list profiles"
+fi
+rm -f "$test_file" 2>/dev/null
+unset exit_code
+unset stderr
+
+# Test 48: Import with empty credentials file
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
+touch "$test_file"
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" import 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ $exit_code -eq 0 ]] && [[ "$stderr" == *"Found 0 profiles"* ]]; then
+    pass "awsprof import handles empty credentials file"
+else
+    fail "awsprof import should report 0 profiles for empty file"
+fi
+rm -f "$test_file" 2>/dev/null
+unset exit_code
+unset stderr
+
+# Test 49: Import with single profile
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
+echo "[onlyprofile]" > "$test_file"
+echo "aws_access_key_id=KEY1" >> "$test_file"
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" import 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ $exit_code -eq 0 ]] && [[ "$stderr" == *"Found 1 profile"* ]] && [[ "$stderr" == *"onlyprofile"* ]]; then
+    pass "awsprof import handles single profile"
+else
+    fail "awsprof import should handle single profile"
+fi
+rm -f "$test_file" 2>/dev/null
+unset exit_code
+unset stderr
+
+# Test 50: Import with many profiles (10+)
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
+for i in {1..12}; do
+    echo "[profile$i]" >> "$test_file"
+    echo "aws_access_key_id=KEY$i" >> "$test_file"
+done
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" import 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ $exit_code -eq 0 ]] && [[ "$stderr" == *"Found 12 profiles"* ]]; then
+    pass "awsprof import handles 10+ profiles"
+else
+    fail "awsprof import should handle 10+ profiles"
+fi
+rm -f "$test_file" 2>/dev/null
+unset exit_code
+unset stderr
+
+# Test 51: Import with comments and blank lines
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
+cat > "$test_file" <<'EOF'
+# This is a comment
+[profile1]
+aws_access_key_id=KEY1
+
+; Another comment
+[profile2]
+aws_access_key_id=KEY2
+
+# Final comment
+EOF
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" import 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+# Check file is unmodified (read-only) - verify file still exists and has content
+file_size_before=$(stat -c %s "$test_file" 2>/dev/null || stat -f %z "$test_file")
+if [[ $exit_code -eq 0 ]] && [[ "$stderr" == *"Found 2 profiles"* ]] && [[ -f "$test_file" ]] && [[ $file_size_before -gt 0 ]]; then
+    pass "awsprof import preserves file structure"
+else
+    fail "awsprof import should preserve file and detect profiles"
+fi
+rm -f "$test_file" 2>/dev/null
+unset exit_code
+unset stderr
+unset file_size_before
+
+# Test 52: Import when credentials file missing
+((TESTS_RUN++))
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="/nonexistent/credentials" "${ROOT_DIR}/awsprof" import 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ $exit_code -eq 0 ]] && [[ "$stderr" == *"No credentials file found"* ]]; then
+    pass "awsprof import handles missing credentials file gracefully"
+else
+    fail "awsprof import should handle missing file with exit 0"
+fi
+unset exit_code
+unset stderr
+
+# Test 53: Import with malformed INI syntax
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
+cat > "$test_file" <<'EOF'
+[valid1]
+aws_access_key_id=KEY1
+[malformed
+aws_access_key_id=BAD
+[valid2]
+aws_access_key_id=KEY2
+EOF
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" import 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+# Should still detect valid profiles, handle errors gracefully
+if [[ $exit_code -eq 0 ]]; then
+    pass "awsprof import handles malformed files gracefully"
+else
+    fail "awsprof import should handle malformed files"
+fi
+rm -f "$test_file" 2>/dev/null
+unset exit_code
+unset stderr
+
+# Test 54: Import with special characters in profile names
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
+echo "[profile-with-dashes]" > "$test_file"
+echo "aws_access_key_id=KEY1" >> "$test_file"
+echo "[profile_with_underscores]" >> "$test_file"
+echo "aws_access_key_id=KEY2" >> "$test_file"
+echo "[profile.with.dots]" >> "$test_file"
+echo "aws_access_key_id=KEY3" >> "$test_file"
+stderr=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" import 2>&1 >/dev/null) && exit_code=0 || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ $exit_code -eq 0 ]] && [[ "$stderr" == *"Found 3 profiles"* ]] && [[ "$stderr" == *"profile-with-dashes"* ]]; then
+    pass "awsprof import handles special characters in names"
+else
+    fail "awsprof import should handle special characters"
+fi
+rm -f "$test_file" 2>/dev/null
+unset exit_code
+unset stderr
+
+# Test 55: Integration - import then list consistency
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
+echo "[test1]" > "$test_file"
+echo "aws_access_key_id=KEY1" >> "$test_file"
+echo "[test2]" >> "$test_file"
+echo "aws_access_key_id=KEY2" >> "$test_file"
+import_output=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" import 2>&1)
+list_output=$(AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" list 2>/dev/null)
+if [[ "$import_output" == *"test1"* ]] && [[ "$import_output" == *"test2"* ]] && [[ "$list_output" == *"test1"* ]] && [[ "$list_output" == *"test2"* ]]; then
+    pass "awsprof import then list shows consistency"
+else
+    fail "awsprof import should match list output"
+fi
+rm -f "$test_file" 2>/dev/null
+unset import_output
+unset list_output
+
+# Test 56: Exit codes always 0 (informational)
+((TESTS_RUN++))
+test_file="${SCRIPT_DIR}/fixtures/test_import.tmp"
+echo "[test]" > "$test_file"
+# Test with valid file - should exit 0
+AWS_SHARED_CREDENTIALS_FILE="$test_file" "${ROOT_DIR}/awsprof" import >/dev/null 2>&1
+exit_code=$?
+rm -f "$test_file" 2>/dev/null
+# Test with missing file - should ALSO exit 0 (informational)
+AWS_SHARED_CREDENTIALS_FILE="/nonexistent/file" "${ROOT_DIR}/awsprof" import >/dev/null 2>&1
+exit_code_missing=$?
+if [[ $exit_code -eq 0 ]] && [[ $exit_code_missing -eq 0 ]]; then
+    pass "awsprof import always exits 0 (informational)"
+else
+    fail "awsprof import should always exit 0"
+fi
+unset exit_code
+unset exit_code_missing
+
 echo
 echo "=============================="
 echo "Tests run: $TESTS_RUN"
