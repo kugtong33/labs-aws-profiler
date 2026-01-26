@@ -36,6 +36,10 @@ If your terminal doesn’t support ANSI colors:
 
 curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh | bash -s -- --no-color
 
+Install the latest from main (HEAD):
+
+curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/heads/main/install.sh | bash -s -- --head
+
 Shell hook safety:
 
 - The shell hook runs in PROMPT_COMMAND and can be silenced by setting `AWSPROF_SILENT_HOOK=1` (default from `awsprof init`).
