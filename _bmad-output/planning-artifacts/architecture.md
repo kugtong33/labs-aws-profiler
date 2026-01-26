@@ -238,7 +238,7 @@ PROMPT_COMMAND="_awsprof_check${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 
 **Installation Command:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh | bash
 ```
 
 ### Decision Impact Analysis

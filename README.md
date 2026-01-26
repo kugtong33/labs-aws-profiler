@@ -30,7 +30,7 @@ A lightweight, standalone CLI tool for managing and switching between AWS profil
 Install via curl:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh | bash
 ```
 
 This will:
@@ -44,7 +44,7 @@ This will:
 1. Download the `awsprof` script:
 ```bash
 mkdir -p ~/.local/bin
-curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.0/awsprof -o ~/.local/bin/awsprof
+curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/awsprof -o ~/.local/bin/awsprof
 chmod +x ~/.local/bin/awsprof
 ```
 
@@ -306,5 +306,5 @@ Current version: 1.0.0
 ## Links
 
 - GitHub Repository: https://github.com/kugtong33/labs-aws-profiler
-- Installation Script: https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.0/install.sh
+- Installation Script: https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh
 - Report Issues: https://github.com/kugtong33/labs-aws-profiler/issues

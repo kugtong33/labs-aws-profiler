@@ -3,10 +3,10 @@
 # awsprof - AWS Profile Management Tool
 # Installation script for curl | bash distribution
 #
-# Version: 0.1.0 (First Release)
+# Version: 0.1.1
 #
 # Installation command:
-#   curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.0/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh | bash
 #
 # This script:
 # 1. Downloads awsprof to ~/.local/bin/
@@ -17,8 +17,8 @@
 set -euo pipefail
 
 # Version information
-readonly VERSION="0.1.0"
-readonly RELEASE_TAG="0.1.0"
+readonly VERSION="0.1.1"
+readonly RELEASE_TAG="0.1.1"
 
 # Color codes for output
 readonly RED='\033[0;31m'
