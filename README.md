@@ -31,6 +31,10 @@ Install via curl:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh | bash
+
+If your terminal doesn’t support ANSI colors:
+
+curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh | bash -s -- --no-color
 ```
 
 This will:

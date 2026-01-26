@@ -8,6 +8,9 @@
 # Installation command:
 #   curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh | bash
 #
+# Disable ANSI colors (for terminals without color support):
+#   curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh | bash -s -- --no-color
+#
 # This script:
 # 1. Downloads awsprof to ~/.local/bin/
 # 2. Makes it executable
@@ -21,11 +24,11 @@ readonly VERSION="0.1.1"
 readonly RELEASE_TAG="0.1.1"
 
 # Color codes for output
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly NC='\033[0m' # No Color
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
 # Installation paths
 readonly INSTALL_DIR="${HOME}/.local/bin"
@@ -202,6 +205,16 @@ verify_installation() {
 
 # Main installation flow
 main() {
+    # Handle color disable flag
+    if [[ "${1:-}" == "--no-color" ]]; then
+        RED=""
+        GREEN=""
+        YELLOW=""
+        BLUE=""
+        NC=""
+        shift
+    fi
+
     print_header "awsprof Installation v${VERSION}"
     print_info "Installation destination: $INSTALL_FILE"
     echo ""
@@ -230,13 +243,13 @@ main() {
     echo ""
     echo "Next steps:"
     echo "1. Reload your shell to enable awsprof:"
-    echo "   ${BLUE}source ~/.bashrc${NC}"
+    printf "   %bsource ~/.bashrc%b\n" "${BLUE}" "${NC}"
     echo ""
     echo "2. Verify installation:"
-    echo "   ${BLUE}awsprof help${NC}"
+    printf "   %bawsprof help%b\n" "${BLUE}" "${NC}"
     echo ""
     echo "3. Check your AWS profiles:"
-    echo "   ${BLUE}awsprof list${NC}"
+    printf "   %bawsprof list%b\n" "${BLUE}" "${NC}"
     echo ""
 }
 
