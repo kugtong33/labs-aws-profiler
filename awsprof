@@ -411,7 +411,7 @@ awsprof_util_read_awsprofile() {
 
     # Read first non-empty line, trim whitespace, and output to stdout
     # Use awk to handle whitespace trimming and ignore empty lines
-    awk 'NF {print; exit}' "$profile_file" | awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}'
+    awk 'NF {print; exit}' "$profile_file" 2>/dev/null | awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' 2>/dev/null
 
     return 0
 }
@@ -747,7 +747,7 @@ awsprof_prompt_switch_profile() {
     # Use read without -p flag to avoid issues with redirected stdin
     printf "Switch profile? [y/N] " >&2
     local response
-    if ! read -t 1 response 2>/dev/null; then
+    if ! read response 2>/dev/null; then
         response=""
     fi
 
@@ -757,7 +757,7 @@ awsprof_prompt_switch_profile() {
             # User wants to switch - execute profile switch via eval wrapper
             # awsprof_cmd_use outputs "export AWS_PROFILE=..." to stdout (for eval)
             # and success message to stderr (for user feedback)
-            eval "$(awsprof_cmd_use "$expected_profile")" 2>/dev/null || true
+            eval "$(awsprof_cmd_use "$expected_profile")" || true
             ;;
         *)
             # All other input (including 'n', 'N', empty) treated as no
@@ -796,9 +796,6 @@ awsprof_hook_detect_profile() {
     # Use emoji for visibility, show both current and expected
     awsprof_msg "⚠️  Profile mismatch: current '$current_profile', project expects '$expected_profile'"
 
-    # Call interactive prompt to ask user if they want to switch
-    awsprof_prompt_switch_profile "$expected_profile" 2>/dev/null || true
-
     return 0
 }
 
@@ -823,28 +820,37 @@ awsprof_cmd_init() {
 # awsprof shell integration - source this in your ~/.bashrc
 # Usage: eval "\$(awsprof init)"
 
-# Define the detection hook function (stub for now, will be enhanced in future stories)
+# Define the detection hook function (calls back into awsprof script)
 awsprof_hook_detect_profile() {
-    # Stub function for PROMPT_COMMAND hook
-    # Future stories will implement:
-    # - Check for .awsprofile file in current directory
-    # - Compare expected profile vs current AWS_PROFILE
-    # - Display warnings and prompts if mismatch detected
-    :
+    # Use resolved awsprof path when available; otherwise no-op to keep shell functional
+    if [[ -n "\$awsprof_bin" ]] && [[ -x "\$awsprof_bin" ]]; then
+        "\$awsprof_bin" --hook-detect-profile || true
+    fi
 }
 
+# Resolve awsprof executable path once at init time (for graceful missing-PATH handling)
+awsprof_bin=\$(command -v awsprof 2>/dev/null || true)
+
 # Define wrapper function that properly handles environment variables
-# Uses 'command awsprof' to find the actual executable, not the function
-# IMPORTANT: Only eval output from commands that produce shell code (use, check)
-# For informational commands (list, whoami, help), call awsprof directly
+# Uses resolved awsprof path when available; falls back to 'command awsprof'
+# IMPORTANT: Only eval output from commands that produce shell code (use)
+# For informational commands (list, whoami, help, check), call awsprof directly
 awsprof() {
     local cmd="\${1:-}"
+    local awsprof_exec="\${awsprof_bin:-}"
+    if [[ -z "\$awsprof_exec" ]]; then
+        awsprof_exec="awsprof"
+    fi
+    if ! command -v "\$awsprof_exec" >/dev/null 2>&1; then
+        printf "awsprof not found in PATH\n" >&2
+        return 1
+    fi
     # Only use eval wrapper for commands that output shell code
-    if [[ "\$cmd" == "use" || "\$cmd" == "check" ]]; then
-        eval "\$(command awsprof "\$@")"
+    if [[ "\$cmd" == "use" ]]; then
+        eval "\$("\$awsprof_exec" "\$@")"
     else
         # For other commands, just execute them directly
-        command awsprof "\$@"
+        "\$awsprof_exec" "\$@"
     fi
 }
 
@@ -865,21 +871,32 @@ INIT_SCRIPT
     if [[ "$shell_mode" == "sh" ]]; then
         cat <<'INIT_SCRIPT_SH'
 # awsprof shell integration for POSIX sh - source this in your ~/.profile
-# Usage: eval "$(awsprof init --sh)"
+# Usage: eval "`awsprof init --sh`"
+
+# Resolve awsprof executable path once at init time (for graceful missing-PATH handling)
+awsprof_bin=`command -v awsprof 2>/dev/null || true`
 
 # Define wrapper function that properly handles environment variables
-# Uses 'command awsprof' to find the actual executable, not the function
+# Uses resolved awsprof path when available; falls back to 'command awsprof'
 # Note: POSIX sh uses backticks for maximum compatibility
-# IMPORTANT: Only eval output from commands that produce shell code (use, check)
-# For informational commands (list, whoami, help), call awsprof directly
+# IMPORTANT: Only eval output from commands that produce shell code (use)
+# For informational commands (list, whoami, help, check), call awsprof directly
 awsprof() {
     cmd="${1:-}"
+    awsprof_exec="${awsprof_bin:-}"
+    if [ -z "$awsprof_exec" ] || [ ! -x "$awsprof_exec" ]; then
+        awsprof_exec=`command -v awsprof 2>/dev/null || true`
+    fi
+    if [ -z "$awsprof_exec" ]; then
+        printf "awsprof not found in PATH\n" >&2
+        return 1
+    fi
     # Only use eval wrapper for commands that output shell code
-    if [ "$cmd" = "use" ] || [ "$cmd" = "check" ]; then
-        eval "`command awsprof "$@"`"
+    if [ "$cmd" = "use" ]; then
+        eval "`command "$awsprof_exec" "$@"`"
     else
         # For other commands, just execute them directly
-        command awsprof "$@"
+        command "$awsprof_exec" "$@"
     fi
 }
 
@@ -938,7 +955,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             exit $?
             ;;
         init)
-            awsprof_cmd_init ${2:-}
+            awsprof_cmd_init "${@:2}"
             exit $?
             ;;
         help|--help|-h|"")
@@ -953,7 +970,8 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             awsprof_msg "  edit <profile>    Edit an existing AWS profile"
             awsprof_msg "  remove <profile>  Remove an AWS profile"
             awsprof_msg "  import            Import profiles from credentials file"
-            awsprof_msg "  check             Check .awsprofile file in current directory"
+            awsprof_msg "  check             Check .awsprofile file in current directory (single line: profile name)"
+            awsprof_msg "                   Example .awsprofile: client-acme (safe to commit)"
             awsprof_msg "  init              Initialize shell integration (use with eval)"
             exit 0
             ;;

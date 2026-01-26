@@ -1295,9 +1295,10 @@ cat > "$test_script" <<EOF
 # Make sure awsprof is in PATH for the wrapper to find
 export PATH="${ROOT_DIR}:\$PATH"
 eval "\$("${ROOT_DIR}/awsprof" init)"
-# Set up a test profile first
-mkdir -p ~/.aws
-cat > ~/.aws/credentials <<'CREDS'
+# Set up a test profile first (isolated credentials file)
+creds_file=\$(mktemp)
+export AWS_SHARED_CREDENTIALS_FILE="\$creds_file"
+cat > "\$creds_file" <<'CREDS'
 [test-profile-abc]
 aws_access_key_id = AKIAIOSFODNN7EXAMPLE
 aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
@@ -1309,6 +1310,7 @@ awsprof use test-profile-abc >/dev/null 2>&1
 if [[ "\$AWS_PROFILE" == "test-profile-abc" ]]; then
     echo "profile_set"
 fi
+rm -f "\$creds_file" 2>/dev/null
 EOF
 result=$(bash "$test_script" 2>/dev/null)
 rm -f "$test_script"
@@ -1383,8 +1385,9 @@ sh_script=$(mktemp)
 cat > "$sh_script" <<SHEOF
 export PATH="${ROOT_DIR}:\$PATH"
 eval "\$("${ROOT_DIR}/awsprof" init --sh)"
-mkdir -p ~/.aws
-cat > ~/.aws/credentials << 'CREDS'
+creds_file=\$(mktemp)
+export AWS_SHARED_CREDENTIALS_FILE="\$creds_file"
+cat > "\$creds_file" << 'CREDS'
 [test-sh-profile]
 aws_access_key_id = AKIAIOSFODNN7EXAMPLE
 aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
@@ -1394,6 +1397,7 @@ awsprof use test-sh-profile >/dev/null 2>&1
 if [ "\$AWS_PROFILE" = "test-sh-profile" ]; then
     echo "profile_set"
 fi
+rm -f "\$creds_file" 2>/dev/null
 SHEOF
 result=$(sh "$sh_script" 2>/dev/null)
 rm -f "$sh_script"
@@ -1432,7 +1436,7 @@ unset init_bash init_sh
 ((TESTS_RUN++))
 init_sh=$("${ROOT_DIR}/awsprof" init --sh 2>/dev/null)
 # POSIX sh version should use backticks for maximum compatibility
-if echo "$init_sh" | grep -q '`command awsprof'; then
+if echo "$init_sh" | grep -q 'awsprof_bin=`'; then
     pass "init --sh uses backticks for command substitution"
 else
     fail "init --sh should use backticks for POSIX compatibility"
@@ -1499,8 +1503,9 @@ test_script=$(mktemp)
 cat > "$test_script" <<EOF
 export PATH="${ROOT_DIR}:\$PATH"
 eval "\$("${ROOT_DIR}/awsprof" init)"
-mkdir -p ~/.aws
-cat > ~/.aws/credentials << 'CREDS'
+creds_file=\$(mktemp)
+export AWS_SHARED_CREDENTIALS_FILE="\$creds_file"
+cat > "\$creds_file" << 'CREDS'
 [test-profile-abc]
 aws_access_key_id = AKIAIOSFODNN7EXAMPLE
 aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
@@ -1511,6 +1516,7 @@ result=\$(awsprof whoami 2>&1)
 if [ "\$result" = "test-profile-abc" ]; then
     echo "whoami_works"
 fi
+rm -f "\$creds_file" 2>/dev/null
 EOF
 result=$(bash "$test_script" 2>/dev/null)
 rm -f "$test_script"
@@ -1527,8 +1533,9 @@ test_script=$(mktemp)
 cat > "$test_script" <<EOF
 export PATH="${ROOT_DIR}:\$PATH"
 eval "\$("${ROOT_DIR}/awsprof" init)"
-mkdir -p ~/.aws
-cat > ~/.aws/credentials << 'CREDS'
+creds_file=\$(mktemp)
+export AWS_SHARED_CREDENTIALS_FILE="\$creds_file"
+cat > "\$creds_file" << 'CREDS'
 [test-list-1]
 aws_access_key_id = AKIAIOSFODNN7EXAMPLE
 aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
@@ -1538,6 +1545,7 @@ result=\$(awsprof list 2>&1 | head -1)
 if [ -n "\$result" ]; then
     echo "list_works"
 fi
+rm -f "\$creds_file" 2>/dev/null
 EOF
 result=$(bash "$test_script" 2>/dev/null)
 rm -f "$test_script"
@@ -1554,8 +1562,9 @@ sh_script=$(mktemp)
 cat > "$sh_script" << SHEOF
 export PATH="${ROOT_DIR}:\$PATH"
 eval "\$("${ROOT_DIR}/awsprof" init --sh)"
-mkdir -p ~/.aws
-cat > ~/.aws/credentials << 'CREDS'
+creds_file=\$(mktemp)
+export AWS_SHARED_CREDENTIALS_FILE="\$creds_file"
+cat > "\$creds_file" << 'CREDS'
 [test-profile-sh]
 aws_access_key_id = AKIAIOSFODNN7EXAMPLE
 aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
@@ -1566,6 +1575,7 @@ result=\$(awsprof whoami 2>&1)
 if [ "\$result" = "test-profile-sh" ]; then
     echo "whoami_sh_works"
 fi
+rm -f "\$creds_file" 2>/dev/null
 SHEOF
 result=$(sh "$sh_script" 2>/dev/null)
 rm -f "$sh_script"
@@ -1573,6 +1583,31 @@ if [[ "$result" == "whoami_sh_works" ]]; then
     pass "POSIX sh wrapper handles informational commands (whoami)"
 else
     fail "POSIX sh wrapper should handle whoami without crashing"
+fi
+unset sh_script result
+
+# Test 96b: POSIX sh wrapper handles check command
+((TESTS_RUN++))
+sh_script=$(mktemp)
+cat > "$sh_script" << SHEOF
+export PATH="${ROOT_DIR}:\$PATH"
+eval "\$("${ROOT_DIR}/awsprof" init --sh)"
+tmpdir=\$(mktemp -d)
+echo "sh-check-profile" > "\$tmpdir/.awsprofile"
+cd "\$tmpdir"
+result=\$(awsprof check 2>&1)
+if [ "\$result" = "sh-check-profile" ]; then
+    echo "check_sh_works"
+fi
+cd / >/dev/null 2>&1 || true
+rm -rf "\$tmpdir"
+SHEOF
+result=$(sh "$sh_script" 2>/dev/null)
+rm -f "$sh_script"
+if [[ "$result" == "check_sh_works" ]]; then
+    pass "POSIX sh wrapper handles check command"
+else
+    fail "POSIX sh wrapper should handle check command"
 fi
 unset sh_script result
 
@@ -1772,141 +1807,161 @@ end_time=$(date +%s%N)
 elapsed_ms=$(( (end_time - start_time) / 1000000 ))
 cd - > /dev/null
 rm -rf "$tmpdir"
-if [[ $elapsed_ms -lt 50 ]]; then  # 50ms is conservative, requirement is 10ms
-    pass "Hook completes under 50ms (should be <10ms)"
+if [[ $elapsed_ms -lt 10 ]]; then
+    pass "Hook completes under 10ms"
 else
     fail "Hook performance issue: ${elapsed_ms}ms (should be <10ms)"
 fi
 unset tmpdir start_time end_time elapsed_ms
 
-# Test 108: Prompt appears on profile mismatch and user accepts with 'y'
+# Test 107b: PROMPT_COMMAND triggers hook on directory change
 ((TESTS_RUN++))
-tmpdir=$(mktemp -d)
-echo "production" > "$tmpdir/.awsprofile"
-cd "$tmpdir"
-# Create the production profile so the switch can succeed
-awsprof add production "test_creds" > /dev/null 2>&1 || true
-# Test with 'y' response - prompt should appear and attempt switch
-output=$(echo "y" | bash -c 'source '"${ROOT_DIR}"'/awsprof; AWS_PROFILE="staging"; awsprof_prompt_switch_profile "production"' 2>&1) || exit_code=$?
-exit_code=${exit_code:-0}
-cd - > /dev/null
-rm -rf "$tmpdir"
-# The output should show the prompt text (which means 'y' was processed)
-if [[ "$output" == *"Switch profile"* ]]; then
-    pass "Prompt appears and 'y' response processes switch"
-else
-    fail "Should show prompt for 'y' input (got output: '$output')"
+test_script=$(mktemp)
+cat > "$test_script" <<EOF
+export PATH="${ROOT_DIR}:\$PATH"
+eval "\$("${ROOT_DIR}/awsprof" init)"
+tmpdir=\$(mktemp -d)
+echo "expected-profile" > "\$tmpdir/.awsprofile"
+export AWS_PROFILE="wrong-profile"
+cd "\$tmpdir" >/dev/null 2>&1
+if [[ "\$PROMPT_COMMAND" == *"awsprof_hook_detect_profile"* ]]; then
+    output=\$(eval "\$PROMPT_COMMAND" 2>&1)
+    if [[ "\$output" == *"Profile mismatch"* ]]; then
+        echo "hook_ran"
+    fi
 fi
-unset output exit_code tmpdir
+rm -rf "\$tmpdir"
+EOF
+result=$(bash "$test_script" 2>/dev/null)
+rm -f "$test_script"
+if [[ "$result" == "hook_ran" ]]; then
+    pass "PROMPT_COMMAND triggers hook on directory change"
+else
+    fail "PROMPT_COMMAND should run hook on directory change"
+fi
+unset test_script result
 
-# Test 109: Uppercase 'Y' response switches profile
+# Test 108: Prompt function switches profile on 'y'
 ((TESTS_RUN++))
-tmpdir=$(mktemp -d)
-echo "production" > "$tmpdir/.awsprofile"
-cd "$tmpdir"
-# Create the production profile for this test
-awsprof add production "test_creds" > /dev/null 2>&1 || true
-# Test with uppercase 'Y' response
-output=$(echo "Y" | bash -c 'source '"${ROOT_DIR}"'/awsprof; AWS_PROFILE="staging"; awsprof_prompt_switch_profile "production"' 2>&1) || exit_code=$?
+output=$(echo "y" | bash -c '
+creds_file=$(mktemp)
+export AWS_SHARED_CREDENTIALS_FILE="$creds_file"
+source '"${ROOT_DIR}"'/awsprof
+cat > "$creds_file" << CREDS
+[production]
+aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+CREDS
+AWS_PROFILE="staging"
+awsprof_prompt_switch_profile "production"
+echo "PROFILE=$AWS_PROFILE"
+rm -f "$creds_file" 2>/dev/null
+' 2>&1) || exit_code=$?
 exit_code=${exit_code:-0}
-cd - > /dev/null
-rm -rf "$tmpdir"
-# Check that the prompt was shown (meaning 'Y' was processed)
-if [[ "$output" == *"Switch profile"* ]]; then
-    pass "Uppercase 'Y' response processes switch"
+if [[ "$output" == *"Switch profile"* ]] && [[ "$output" == *"Switched to profile: production"* ]] && [[ "$output" == *"PROFILE=production"* ]]; then
+    pass "Prompt switches profile on 'y'"
 else
-    fail "Should show prompt for 'Y' input (got output: '$output')"
+    fail "Prompt should switch on 'y' (got output: '$output')"
 fi
-unset output exit_code tmpdir
+unset output exit_code
 
-# Test 110: Lowercase 'n' response declines switch
+# Test 109: Prompt function switches profile on 'Y'
 ((TESTS_RUN++))
-tmpdir=$(mktemp -d)
-echo "production" > "$tmpdir/.awsprofile"
-cd "$tmpdir"
-AWS_PROFILE="staging" output=$(echo "n" | "${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+output=$(echo "Y" | bash -c '
+creds_file=$(mktemp)
+export AWS_SHARED_CREDENTIALS_FILE="$creds_file"
+source '"${ROOT_DIR}"'/awsprof
+cat > "$creds_file" << CREDS
+[production]
+aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+CREDS
+AWS_PROFILE="staging"
+awsprof_prompt_switch_profile "production"
+echo "PROFILE=$AWS_PROFILE"
+rm -f "$creds_file" 2>/dev/null
+' 2>&1) || exit_code=$?
 exit_code=${exit_code:-0}
-new_profile="$AWS_PROFILE"
-cd - > /dev/null
-rm -rf "$tmpdir"
-# Should NOT contain "Switched to profile" message, profile should remain
-if [[ "$output" != *"Switched to profile"* ]] && [[ "$new_profile" == "staging" ]]; then
-    pass "Lowercase 'n' response declines switch"
+if [[ "$output" == *"Switch profile"* ]] && [[ "$output" == *"Switched to profile: production"* ]] && [[ "$output" == *"PROFILE=production"* ]]; then
+    pass "Prompt switches profile on 'Y'"
 else
-    fail "Should not switch on 'n' (profile: '$new_profile')"
+    fail "Prompt should switch on 'Y' (got output: '$output')"
 fi
-unset output exit_code tmpdir new_profile
+unset output exit_code
 
-# Test 111: Uppercase 'N' response declines switch
+# Test 110: Prompt function declines on 'n'
 ((TESTS_RUN++))
-tmpdir=$(mktemp -d)
-echo "production" > "$tmpdir/.awsprofile"
-cd "$tmpdir"
-AWS_PROFILE="staging" output=$(echo "N" | "${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+output=$(echo "n" | bash -c '
+source '"${ROOT_DIR}"'/awsprof
+AWS_PROFILE="staging"
+awsprof_prompt_switch_profile "production"
+echo "PROFILE=$AWS_PROFILE"
+' 2>&1) || exit_code=$?
 exit_code=${exit_code:-0}
-new_profile="$AWS_PROFILE"
-cd - > /dev/null
-rm -rf "$tmpdir"
-if [[ "$output" != *"Switched to profile"* ]] && [[ "$new_profile" == "staging" ]]; then
-    pass "Uppercase 'N' response declines switch"
+if [[ "$output" == *"Switch profile"* ]] && [[ "$output" == *"PROFILE=staging"* ]]; then
+    pass "Prompt declines on 'n'"
 else
-    fail "Should not switch on 'N' (profile: '$new_profile')"
+    fail "Prompt should decline on 'n' (got output: '$output')"
 fi
-unset output exit_code tmpdir new_profile
+unset output exit_code
 
-# Test 112: Enter (empty input) declines switch
+# Test 111: Prompt function declines on 'N'
 ((TESTS_RUN++))
-tmpdir=$(mktemp -d)
-echo "production" > "$tmpdir/.awsprofile"
-cd "$tmpdir"
-AWS_PROFILE="staging" output=$(echo "" | "${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+output=$(echo "N" | bash -c '
+source '"${ROOT_DIR}"'/awsprof
+AWS_PROFILE="staging"
+awsprof_prompt_switch_profile "production"
+echo "PROFILE=$AWS_PROFILE"
+' 2>&1) || exit_code=$?
 exit_code=${exit_code:-0}
-new_profile="$AWS_PROFILE"
-cd - > /dev/null
-rm -rf "$tmpdir"
-# Empty input (pressing Enter) should be treated as no
-if [[ "$output" != *"Switched to profile"* ]] && [[ "$new_profile" == "staging" ]]; then
-    pass "Enter (empty input) declines switch"
+if [[ "$output" == *"Switch profile"* ]] && [[ "$output" == *"PROFILE=staging"* ]]; then
+    pass "Prompt declines on 'N'"
 else
-    fail "Should not switch on empty input (profile: '$new_profile')"
+    fail "Prompt should decline on 'N' (got output: '$output')"
 fi
-unset output exit_code tmpdir new_profile
+unset output exit_code
 
-# Test 113: Invalid input treated as no
+# Test 112: Prompt function declines on Enter
 ((TESTS_RUN++))
-tmpdir=$(mktemp -d)
-echo "production" > "$tmpdir/.awsprofile"
-cd "$tmpdir"
-AWS_PROFILE="staging" output=$(echo "maybe" | "${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+output=$(echo "" | bash -c '
+source '"${ROOT_DIR}"'/awsprof
+AWS_PROFILE="staging"
+awsprof_prompt_switch_profile "production"
+echo "PROFILE=$AWS_PROFILE"
+' 2>&1) || exit_code=$?
 exit_code=${exit_code:-0}
-new_profile="$AWS_PROFILE"
-cd - > /dev/null
-rm -rf "$tmpdir"
-# Invalid input should be treated as no
-if [[ "$output" != *"Switched to profile"* ]] && [[ "$new_profile" == "staging" ]]; then
-    pass "Invalid input treated as no"
+if [[ "$output" == *"Switch profile"* ]] && [[ "$output" == *"PROFILE=staging"* ]]; then
+    pass "Prompt declines on Enter"
 else
-    fail "Should treat invalid input as no (profile: '$new_profile')"
+    fail "Prompt should decline on Enter (got output: '$output')"
 fi
-unset output exit_code tmpdir new_profile
+unset output exit_code
+
+# Test 113: Prompt function declines on invalid input
+((TESTS_RUN++))
+output=$(echo "maybe" | bash -c '
+source '"${ROOT_DIR}"'/awsprof
+AWS_PROFILE="staging"
+awsprof_prompt_switch_profile "production"
+echo "PROFILE=$AWS_PROFILE"
+' 2>&1) || exit_code=$?
+exit_code=${exit_code:-0}
+if [[ "$output" == *"Switch profile"* ]] && [[ "$output" == *"PROFILE=staging"* ]]; then
+    pass "Prompt declines on invalid input"
+else
+    fail "Prompt should decline on invalid input (got output: '$output')"
+fi
+unset output exit_code
 
 # Test 114: Shell remains functional after prompt
 ((TESTS_RUN++))
-tmpdir=$(mktemp -d)
-echo "production" > "$tmpdir/.awsprofile"
-cd "$tmpdir"
-AWS_PROFILE="staging"
-echo "y" | "${ROOT_DIR}/awsprof" --hook-detect-profile >/dev/null 2>&1 || true
-# Try a simple shell command after the prompt
 result=$(bash -c "echo 'shell works'" 2>&1)
-cd - > /dev/null
-rm -rf "$tmpdir"
 if [[ "$result" == "shell works" ]]; then
     pass "Shell remains functional after prompt"
 else
     fail "Shell should remain functional after prompt"
 fi
-unset tmpdir result
+unset result
 
 # Story 3.6 Tests: Error handling and robustness
 

@@ -1,6 +1,6 @@
 # Story 3.6: Shell Integration Robustness
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -313,19 +313,16 @@ Claude Haiku 4.5 (claude-haiku-4-5-20251001)
 ### Completion Notes List
 
 ✅ **Implementation Complete:**
-- Verified all error handling already exists in Stories 3.1-3.5 code
-- `awsprof_hook_detect_profile()` properly implements non-blocking behavior (always returns 0)
-- All hook function calls have error suppression (`2>/dev/null || true`)
+- Hook no longer invokes interactive prompt (robustness: avoid blocking inside PROMPT_COMMAND)
+- `awsprof_hook_detect_profile()` remains non-blocking (always returns 0)
 - File reads have defensive error handling (return empty string on error)
-- `awsprof_prompt_switch_profile()` has timeout protection (1-second read timeout)
-- All eval/function calls have error suppression
-- Created comprehensive test coverage for all error scenarios
+- Interactive prompt remains available as a direct helper function
+- Created comprehensive test coverage for robustness scenarios
 
 ✅ **Error Handling Features Verified:**
 - Hook returns 0 always (NFR13 compliance - never breaks shell)
-- All stderr suppressed in hook context via `2>/dev/null`
-- Errors shown only in direct command context (user-facing)
-- Timeout protection prevents hang on slow I/O
+- Warning is allowed in hook context; errors are shown only for direct commands
+- Prompt not invoked inside hook to avoid hanging shell
 - Graceful degradation - skips operations on error, continues normally
 - Session independence - each shell session has own environment
 
@@ -351,16 +348,19 @@ Claude Haiku 4.5 (claude-haiku-4-5-20251001)
 - Shell remains functional even on complete failure
 
 ✅ **Code Quality:**
-- No new files created (leverages existing error handling from Stories 3.1-3.5)
-- No modifications needed to `awsprof` (already implements all required error handling)
-- Tests added to `tests/test_commands.sh` validate robustness
-- Zero regressions in existing 114 tests
+- Updates made in `awsprof` and `tests/test_commands.sh` to align with robustness requirements
+- Tests validate robustness without invoking prompt inside hook
+- Zero regressions in existing tests
+
+✅ **Latest Test Results (2026-01-26):**
+- `bash tests/test_commands.sh` → 121/121 passing
 
 ---
 
 ## File List
 
-- `tests/test_commands.sh` - Added 5 new robustness tests (Tests 115-119)
+- `awsprof` - Hook avoids interactive prompt for robustness
+- `tests/test_commands.sh` - Added robustness tests (Tests 115-119)
 
 ## Change Log
 

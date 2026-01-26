@@ -344,6 +344,17 @@ Claude Haiku 4.5 (claude-haiku-4-5-20251001)
 - `awsprof` - Added init command and shell integration section (~55 lines)
 - `tests/test_commands.sh` - Added 10 new tests (~130 lines)
 
+✅ **Post-Review Fixes (2026-01-26):**
+- Init output now resolves the awsprof path once, guards missing executables, and uses eval only for `use`
+- PROMPT_COMMAND hook now calls back into `awsprof --hook-detect-profile` (no stubbed hook)
+- `init` dispatch now forwards all args so extra arguments are rejected
+- Tests now use `AWS_SHARED_CREDENTIALS_FILE` with temp files instead of `~/.aws/credentials`
+- Updated POSIX sh backtick detection test to match init output
+
+✅ **Latest Test Results (2026-01-26):**
+- `bash tests/test_commands.sh` → 119/119 passing
+- `bash tests/test_ini.sh` → 24/24 passing
+
 ### Code Review Findings & Fixes
 
 **Adversarial Code Review Results:** 6 total findings (2 CRITICAL, 3 MEDIUM, 1 LOW)

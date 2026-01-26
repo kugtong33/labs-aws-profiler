@@ -299,6 +299,15 @@ Claude Haiku 4.5 (claude-haiku-4-5-20251001)
 - `awsprof` - Extended `awsprof_cmd_init()` with `--sh` flag support and conditional output (~40 lines changed)
 - `tests/test_commands.sh` - Added 10 new comprehensive tests (~180 lines added, fixed variable substitution in existing tests)
 
+✅ **Post-Review Fixes (2026-01-26):**
+- POSIX sh wrapper now avoids recursion by using `command` for execution and re-resolves PATH when needed
+- Added sh wrapper `awsprof check` coverage
+- POSIX sh usage comment updated to use backticks for compatibility
+
+✅ **Latest Test Results (2026-01-26):**
+- `bash tests/test_commands.sh` → 119/119 passing
+- `bash tests/test_ini.sh` → 24/24 passing
+
 ### Code Review Findings and Fixes
 
 **CRITICAL BUG DISCOVERED (Fixed):**
@@ -358,3 +367,5 @@ awsprof() {
 
 - `awsprof` - Main script (extended `awsprof_cmd_init()` function with --sh flag handling, plus critical wrapper bug fix)
 - `tests/test_commands.sh` - Test suite (added 13 new tests: 10 for init --sh, 3 for wrapper bug fix)
+- `_bmad-output/implementation-artifacts/3-1-shell-initialization-script-for-bash.md` - Story record update (post-review fixes)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` - Tracking timestamp update
