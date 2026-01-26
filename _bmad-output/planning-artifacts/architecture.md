@@ -405,7 +405,7 @@ The single `awsprof` file contains embedded modules:
 #!/usr/bin/env bash
 #
 # awsprof - AWS Profile Manager
-# https://github.com/ubuntu/labs-aws-profiler
+# https://github.com/kugtong33/labs-aws-profiler
 #
 
 #=== CONFIGURATION ===

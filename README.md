@@ -305,6 +305,6 @@ Current version: 1.0.0
 
 ## Links
 
-- GitHub Repository: https://github.com/ubuntu/labs-aws-profiler
+- GitHub Repository: https://github.com/kugtong33/labs-aws-profiler
 - Installation Script: https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.0/install.sh
-- Report Issues: https://github.com/ubuntu/labs-aws-profiler/issues
+- Report Issues: https://github.com/kugtong33/labs-aws-profiler/issues
