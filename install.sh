@@ -3,8 +3,10 @@
 # awsprof - AWS Profile Management Tool
 # Installation script for curl | bash distribution
 #
+# Version: 0.1.0 (First Release)
+#
 # Installation command:
-#   curl -fsSL https://raw.githubusercontent.com/ubuntu/labs-aws-profiler/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/ubuntu/labs-aws-profiler/0.1.0/install.sh | bash
 #
 # This script:
 # 1. Downloads awsprof to ~/.local/bin/
@@ -13,6 +15,10 @@
 # 4. Verifies installation
 
 set -euo pipefail
+
+# Version information
+readonly VERSION="0.1.0"
+readonly RELEASE_TAG="0.1.0"
 
 # Color codes for output
 readonly RED='\033[0;31m'
@@ -28,7 +34,7 @@ readonly BASHRC="${HOME}/.bashrc"
 readonly BASHRC_BACKUP="${HOME}/.bashrc.backup.$(date +%s)"
 
 # GitHub URLs
-readonly GITHUB_RAW_URL="https://raw.githubusercontent.com/ubuntu/labs-aws-profiler/main"
+readonly GITHUB_RAW_URL="https://raw.githubusercontent.com/ubuntu/labs-aws-profiler/${RELEASE_TAG}"
 readonly AWSPROF_URL="${GITHUB_RAW_URL}/awsprof"
 
 # Helper functions
@@ -196,7 +202,7 @@ verify_installation() {
 
 # Main installation flow
 main() {
-    print_header "awsprof Installation"
+    print_header "awsprof Installation v${VERSION}"
     print_info "Installation destination: $INSTALL_FILE"
     echo ""
 
