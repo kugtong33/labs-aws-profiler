@@ -833,8 +833,8 @@ awsprof_hook_detect_profile() {
     fi
 }
 
-# Resolve awsprof executable path once at init time (for graceful missing-PATH handling)
-awsprof_bin=\$(command -v awsprof 2>/dev/null || true)
+# Resolve awsprof executable path once at init time (prefer external binary over function)
+awsprof_bin=\$(type -P awsprof 2>/dev/null || true)
 
 # Define wrapper function that properly handles environment variables
 # Uses resolved awsprof path when available; falls back to 'command awsprof'
@@ -842,20 +842,22 @@ awsprof_bin=\$(command -v awsprof 2>/dev/null || true)
 # For informational commands (list, whoami, help, check), call awsprof directly
 awsprof() {
     local cmd="\${1:-}"
-    local awsprof_exec="\${awsprof_bin:-}"
-    if [[ -z "\$awsprof_exec" ]]; then
-        awsprof_exec="awsprof"
+    local awsprof_exec=""
+    if [[ -n "\$awsprof_bin" ]] && [[ -x "\$awsprof_bin" ]]; then
+        awsprof_exec="\$awsprof_bin"
+    else
+        awsprof_exec=\$(type -P awsprof 2>/dev/null || true)
     fi
-    if ! command -v "\$awsprof_exec" >/dev/null 2>&1; then
+    if [[ -z "\$awsprof_exec" ]]; then
         printf "awsprof not found in PATH\n" >&2
         return 1
     fi
     # Only use eval wrapper for commands that output shell code
     if [[ "\$cmd" == "use" ]]; then
-        eval "\$("\$awsprof_exec" "\$@")"
+        eval "\$(command "\$awsprof_exec" "\$@")"
     else
         # For other commands, just execute them directly
-        "\$awsprof_exec" "\$@"
+        command "\$awsprof_exec" "\$@"
     fi
 }
 
@@ -882,6 +884,9 @@ INIT_SCRIPT
 
 # Resolve awsprof executable path once at init time (for graceful missing-PATH handling)
 awsprof_bin=`command -v awsprof 2>/dev/null || true`
+if [ -n "$awsprof_bin" ] && [ ! -x "$awsprof_bin" ]; then
+    awsprof_bin=""
+fi
 
 # Define wrapper function that properly handles environment variables
 # Uses resolved awsprof path when available; falls back to 'command awsprof'
@@ -890,9 +895,14 @@ awsprof_bin=`command -v awsprof 2>/dev/null || true`
 # For informational commands (list, whoami, help, check), call awsprof directly
 awsprof() {
     cmd="${1:-}"
-    awsprof_exec="${awsprof_bin:-}"
-    if [ -z "$awsprof_exec" ] || [ ! -x "$awsprof_exec" ]; then
+    awsprof_exec=""
+    if [ -n "$awsprof_bin" ] && [ -x "$awsprof_bin" ]; then
+        awsprof_exec="$awsprof_bin"
+    else
         awsprof_exec=`command -v awsprof 2>/dev/null || true`
+        if [ -n "$awsprof_exec" ] && [ ! -x "$awsprof_exec" ]; then
+            awsprof_exec=""
+        fi
     fi
     if [ -z "$awsprof_exec" ]; then
         printf "awsprof not found in PATH\n" >&2
