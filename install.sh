@@ -6,7 +6,7 @@
 # Version: 0.1.0 (First Release)
 #
 # Installation command:
-#   curl -fsSL https://raw.githubusercontent.com/ubuntu/labs-aws-profiler/0.1.0/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.0/install.sh | bash
 #
 # This script:
 # 1. Downloads awsprof to ~/.local/bin/
@@ -34,7 +34,7 @@ readonly BASHRC="${HOME}/.bashrc"
 readonly BASHRC_BACKUP="${HOME}/.bashrc.backup.$(date +%s)"
 
 # GitHub URLs
-readonly GITHUB_RAW_URL="https://raw.githubusercontent.com/ubuntu/labs-aws-profiler/${RELEASE_TAG}"
+readonly GITHUB_RAW_URL="https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/${RELEASE_TAG}"
 readonly AWSPROF_URL="${GITHUB_RAW_URL}/awsprof"
 
 # Helper functions
