@@ -280,7 +280,7 @@ curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/ta
 - Examples:
   ```bash
   AWSPROF_EMOJI="${AWSPROF_EMOJI:-0}"      # User config
-  _awsprof_version="1.0.0"                  # Internal
+  _awsprof_version="0.1.1"                  # Internal
   local profile_name="$1"                   # Local
   ```
 
@@ -409,7 +409,7 @@ The single `awsprof` file contains embedded modules:
 #
 
 #=== CONFIGURATION ===
-_awsprof_version="1.0.0"
+_awsprof_version="0.1.1"
 _awsprof_credentials="${AWS_SHARED_CREDENTIALS_FILE:-$HOME/.aws/credentials}"
 _awsprof_config="${AWS_CONFIG_FILE:-$HOME/.aws/config}"
 AWSPROF_EMOJI="${AWSPROF_EMOJI:-0}"

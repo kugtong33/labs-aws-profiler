@@ -10,7 +10,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 fi
 
 #=== CONFIGURATION ===
-_awsprof_version="1.0.0"
+_awsprof_version="0.1.1"
 _awsprof_credentials="${AWS_SHARED_CREDENTIALS_FILE:-$HOME/.aws/credentials}"
 _awsprof_config="${AWS_CONFIG_FILE:-$HOME/.aws/config}"
 AWSPROF_EMOJI="${AWSPROF_EMOJI:-0}"
@@ -792,6 +792,11 @@ awsprof_hook_detect_profile() {
         return 0
     fi
 
+    # If hook output is silenced, return without printing
+    if [[ "${AWSPROF_SILENT_HOOK:-0}" == "1" ]]; then
+        return 0
+    fi
+
     # Profiles mismatch - display warning message
     # Use emoji for visibility, show both current and expected
     awsprof_msg "⚠️  Profile mismatch: current '$current_profile', project expects '$expected_profile'"
@@ -856,11 +861,13 @@ awsprof() {
 
 # Set up PROMPT_COMMAND hook for directory change detection
 if [[ -z "\$PROMPT_COMMAND" ]]; then
+    AWSPROF_SILENT_HOOK=1
     PROMPT_COMMAND='awsprof_hook_detect_profile'
 else
-    # Append to existing PROMPT_COMMAND without duplicating
+    # Prepend to existing PROMPT_COMMAND without duplicating
     if [[ "\$PROMPT_COMMAND" != *"awsprof_hook_detect_profile"* ]]; then
-        PROMPT_COMMAND="\${PROMPT_COMMAND%;};awsprof_hook_detect_profile"
+        AWSPROF_SILENT_HOOK=1
+        PROMPT_COMMAND="awsprof_hook_detect_profile;\${PROMPT_COMMAND#;}"
     fi
 fi
 

@@ -143,7 +143,7 @@ aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY2
 #
 
 #=== CONFIGURATION ===
-_awsprof_version="1.0.0"
+_awsprof_version="0.1.1"
 _awsprof_credentials="${AWS_SHARED_CREDENTIALS_FILE:-$HOME/.aws/credentials}"
 _awsprof_config="${AWS_CONFIG_FILE:-$HOME/.aws/config}"
 AWSPROF_EMOJI="${AWSPROF_EMOJI:-0}"

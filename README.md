@@ -35,6 +35,11 @@ curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/ta
 If your terminal doesn’t support ANSI colors:
 
 curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh | bash -s -- --no-color
+
+Shell hook safety:
+
+- The shell hook runs in PROMPT_COMMAND and can be silenced by setting `AWSPROF_SILENT_HOOK=1` (default from `awsprof init`).
+- To see mismatch warnings manually, run: `AWSPROF_SILENT_HOOK=0 awsprof --hook-detect-profile`
 ```
 
 This will:
@@ -305,7 +310,7 @@ Created by Ubuntu for managing multiple AWS profiles across infrastructure proje
 
 ## Version
 
-Current version: 1.0.0
+Current version: 0.1.1
 
 ## Links
 
