@@ -1803,6 +1803,25 @@ else
 fi
 unset stdout stderr exit_code tmpdir
 
+# Test 104b: No mismatch warning when .awsprofile mismatch auto-switches
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "production" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+stderr_file=$(mktemp)
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" AWS_PROFILE="staging" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "export AWS_PROFILE=production" ]] && [[ -z "$stderr" ]]; then
+    pass "No mismatch warning when auto-switching"
+else
+    fail "Should be silent on mismatch auto-switch (stdout: '$stdout', stderr: '$stderr')"
+fi
+unset stdout stderr exit_code tmpdir
+
 # Test 105: Unset AWS_PROFILE auto-switches
 ((TESTS_RUN++))
 tmpdir=$(mktemp -d)
@@ -1857,6 +1876,26 @@ if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "export AWS_PROFILE=default" ]] && 
     pass "Global .awsprofile fallback applies when project file missing"
 else
     fail "Global fallback should apply (stdout: '$stdout', stderr: '$stderr')"
+fi
+unset stdout stderr exit_code tmpdir home_dir
+
+# Test 106b2: Global .awsprofile missing and project missing is silent
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+home_dir=$(mktemp -d)
+mkdir -p "$home_dir/.aws"
+cd "$tmpdir"
+stderr_file=$(mktemp)
+stdout=$(HOME="$home_dir" AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir" "$home_dir"
+if [[ $exit_code -eq 0 ]] && [[ -z "$stdout" ]] && [[ -z "$stderr" ]]; then
+    pass "No project/global .awsprofile is silent"
+else
+    fail "Missing project/global .awsprofile should be silent (stdout: '$stdout', stderr: '$stderr')"
 fi
 unset stdout stderr exit_code tmpdir home_dir
 
@@ -1938,6 +1977,27 @@ else
     fail "Missing profile should warn and clear AWS_PROFILE (stdout: '$stdout', stderr: '$stderr')"
 fi
 unset stdout stderr exit_code tmpdir
+
+# Test 106d2: Invalid global profile name warns and clears AWS_PROFILE
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+home_dir=$(mktemp -d)
+mkdir -p "$home_dir/.aws"
+echo "bad;name" > "$home_dir/.aws/.awsprofile"
+cd "$tmpdir"
+stderr_file=$(mktemp)
+stdout=$(HOME="$home_dir" AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" AWS_PROFILE="staging" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir" "$home_dir"
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "unset AWS_PROFILE" ]] && [[ "$stderr" == *"not found"* ]]; then
+    pass "Invalid global .awsprofile warns and clears AWS_PROFILE"
+else
+    fail "Invalid global .awsprofile should warn and clear (stdout: '$stdout', stderr: '$stderr')"
+fi
+unset stdout stderr exit_code tmpdir home_dir
 
 # Test 106e: Missing profile then added switches normally
 ((TESTS_RUN++))

@@ -1,6 +1,6 @@
 # Story 4.3: Direct Use Without Mismatch Checks
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -85,7 +85,7 @@ so that profile switching is automatic and silent.
 
 ### Story Completion Status
 
-- Status set to `ready-for-dev`
+- Status set to `done`
 
 ## Dev Agent Record
 
@@ -96,14 +96,17 @@ GPT-5 (Codex CLI)
 ### Debug Log References
 
 - `bash tests/test_commands.sh`
+- `bash tests/test_commands.sh` (post-review fixes)
 ### Completion Notes List
 
 - Direct `.awsprofile` auto-switch is already implemented with no mismatch warnings/prompts.
 - Existing tests cover silent behavior when profiles match and auto-switch behavior on mismatch.
+- Added explicit test ensuring no mismatch warning on `.awsprofile` mismatch auto-switch.
 ### File List
 
-- None (no code changes required for this story)
+- tests/test_commands.sh
 
 ## Change Log
 
 - 2026-01-30: Verified direct `.awsprofile` behavior and test coverage.
+- 2026-01-30: Code review fixes for explicit no-warning test and status sync.

@@ -1,6 +1,6 @@
 # Story 4.2: Global .awsprofile Fallback
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -97,7 +97,7 @@ so that I get automatic profile selection even outside project directories.
 
 ### Story Completion Status
 
-- Status set to `ready-for-dev`
+- Status set to `done`
 
 ## Dev Agent Record
 
@@ -108,11 +108,12 @@ GPT-5 (Codex CLI)
 ### Debug Log References
 
 - `bash tests/test_commands.sh`
-- `bash tests/test_ini.sh`
+- `bash tests/test_commands.sh` (post-review fixes)
 ### Completion Notes List
 
 - Added global `.awsprofile` fallback with project precedence and silent no-file behavior.
 - Added tests for global fallback and precedence; all command tests pass.
+- Added tests for no-files silent behavior and invalid global profile name handling.
 ### File List
 
 - awsprof
@@ -121,3 +122,4 @@ GPT-5 (Codex CLI)
 ## Change Log
 
 - 2026-01-30: Added global .awsprofile fallback and tests.
+- 2026-01-30: Code review fixes for silent no-files and invalid global profile tests.
