@@ -1882,6 +1882,62 @@ else
 fi
 unset stdout stderr exit_code tmpdir home_dir
 
+# Test 106d: Missing profile warns and clears AWS_PROFILE
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "missing-profile" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+stderr_file=$(mktemp)
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" AWS_PROFILE="staging" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "unset AWS_PROFILE" ]] && [[ "$stderr" == *"not found"* ]]; then
+    pass "Missing profile warns and clears AWS_PROFILE"
+else
+    fail "Missing profile should warn and clear AWS_PROFILE (stdout: '$stdout', stderr: '$stderr')"
+fi
+unset stdout stderr exit_code tmpdir
+
+# Test 106e: Missing profile then added switches normally
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "newprofile" > "$tmpdir/.awsprofile"
+creds_file=$(mktemp)
+cat > "$creds_file" << CREDS
+[default]
+aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+CREDS
+cd "$tmpdir"
+stderr_file=$(mktemp)
+stdout1=$(AWS_SHARED_CREDENTIALS_FILE="$creds_file" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr1=$(cat "$stderr_file")
+rm -f "$stderr_file"
+cat >> "$creds_file" << CREDS
+[newprofile]
+aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+CREDS
+stderr_file=$(mktemp)
+stdout2=$(AWS_SHARED_CREDENTIALS_FILE="$creds_file" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code2=$?
+stderr2=$(cat "$stderr_file")
+rm -f "$stderr_file"
+exit_code=${exit_code:-0}
+exit_code2=${exit_code2:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+rm -f "$creds_file"
+if [[ $exit_code -eq 0 ]] && [[ "$stdout1" == "unset AWS_PROFILE" ]] && [[ "$stderr1" == *"not found"* ]] \
+   && [[ $exit_code2 -eq 0 ]] && [[ "$stdout2" == "export AWS_PROFILE=newprofile" ]] && [[ -z "$stderr2" ]]; then
+    pass "Missing profile switches normally after added"
+else
+    fail "Missing profile should switch after add (stdout1: '$stdout1', stderr1: '$stderr1', stdout2: '$stdout2', stderr2: '$stderr2')"
+fi
+unset stdout1 stderr1 stdout2 stderr2 exit_code exit_code2 tmpdir creds_file
+
 # Test 107: Hook completes under 10ms (performance check)
 ((TESTS_RUN++))
 tmpdir=$(mktemp -d)

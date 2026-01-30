@@ -70,4 +70,5 @@ development_status:
   4-1-project-awsprofile-auto-switch: review
   4-2-global-awsprofile-fallback: review
   4-3-direct-use-without-mismatch-checks: review
+  4-4-missing-profile-handling: review
   epic-4-retrospective: optional
