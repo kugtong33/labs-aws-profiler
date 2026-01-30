@@ -1839,6 +1839,49 @@ else
 fi
 unset output exit_code tmpdir
 
+# Test 106b: Global .awsprofile fallback when project file missing
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+home_dir=$(mktemp -d)
+mkdir -p "$home_dir/.aws"
+echo "default" > "$home_dir/.aws/.awsprofile"
+cd "$tmpdir"
+stderr_file=$(mktemp)
+stdout=$(HOME="$home_dir" AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir" "$home_dir"
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "export AWS_PROFILE=default" ]] && [[ -z "$stderr" ]]; then
+    pass "Global .awsprofile fallback applies when project file missing"
+else
+    fail "Global fallback should apply (stdout: '$stdout', stderr: '$stderr')"
+fi
+unset stdout stderr exit_code tmpdir home_dir
+
+# Test 106c: Project .awsprofile takes precedence over global
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+home_dir=$(mktemp -d)
+mkdir -p "$home_dir/.aws"
+echo "default" > "$home_dir/.aws/.awsprofile"
+echo "staging" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+stderr_file=$(mktemp)
+stdout=$(HOME="$home_dir" AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir" "$home_dir"
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "export AWS_PROFILE=staging" ]] && [[ -z "$stderr" ]]; then
+    pass "Project .awsprofile takes precedence over global"
+else
+    fail "Project should override global (stdout: '$stdout', stderr: '$stderr')"
+fi
+unset stdout stderr exit_code tmpdir home_dir
+
 # Test 107: Hook completes under 10ms (performance check)
 ((TESTS_RUN++))
 tmpdir=$(mktemp -d)

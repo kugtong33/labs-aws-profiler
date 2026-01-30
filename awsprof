@@ -399,10 +399,16 @@ awsprof_ini_delete_section() {
 }
 
 #=== UTILITY FUNCTIONS ===
+# awsprof_util_read_awsprofile_path - Read .awsprofile file from provided path
 # awsprof_util_read_awsprofile - Read .awsprofile file from current directory
+# awsprof_util_read_global_awsprofile - Read global .awsprofile file from ~/.aws
 
-awsprof_util_read_awsprofile() {
-    local profile_file="./.awsprofile"
+awsprof_util_read_awsprofile_path() {
+    local profile_file="$1"
+
+    if [[ -z "$profile_file" ]]; then
+        return 0
+    fi
 
     # Check if file exists
     if [[ ! -f "$profile_file" ]]; then
@@ -414,6 +420,14 @@ awsprof_util_read_awsprofile() {
     awk 'NF {print; exit}' "$profile_file" 2>/dev/null | awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' 2>/dev/null
 
     return 0
+}
+
+awsprof_util_read_awsprofile() {
+    awsprof_util_read_awsprofile_path "./.awsprofile"
+}
+
+awsprof_util_read_global_awsprofile() {
+    awsprof_util_read_awsprofile_path "$HOME/.aws/.awsprofile"
 }
 
 #=== PROFILE COMMANDS ===
@@ -774,11 +788,16 @@ awsprof_hook_detect_profile() {
     # Checks for .awsprofile file and applies profile automatically when valid
     # Must complete quickly (under 10ms) and not affect shell performance
 
-    # Get expected profile from .awsprofile file (from Story 3.3 helper)
+    # Get expected profile from project .awsprofile file (from Story 3.3 helper)
     local expected_profile
     expected_profile=$(awsprof_util_read_awsprofile 2>/dev/null) || expected_profile=""
 
-    # If no .awsprofile file, exit silently (no project expectation)
+    # If no project .awsprofile, fall back to global ~/.aws/.awsprofile
+    if [[ -z "$expected_profile" ]]; then
+        expected_profile=$(awsprof_util_read_global_awsprofile 2>/dev/null) || expected_profile=""
+    fi
+
+    # If still empty, exit silently (no expectation)
     if [[ -z "$expected_profile" ]]; then
         return 0
     fi
