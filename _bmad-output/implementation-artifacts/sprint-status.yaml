@@ -65,3 +65,7 @@ development_status:
   3-5-interactive-profile-switch-prompt: done
   3-6-shell-integration-robustness: done
   epic-3-retrospective: optional
+
+  epic-4: in-progress
+  4-1-project-awsprofile-auto-switch: review
+  epic-4-retrospective: optional

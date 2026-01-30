@@ -66,6 +66,12 @@ This document provides the complete epic and story breakdown for labs-aws-profil
 - FR33: System never displays secret access keys in output
 - FR34: System writes credentials directly to file (no intermediate storage)
 
+- FR35: System detects a project ".awsprofile" file and immediately switches to the specified profile when it is valid
+- FR36: System supports a global ".awsprofile" file located at "~/.aws/.awsprofile"
+- FR37: If no project ".awsprofile" exists, system uses the global ".awsprofile" by default
+- FR38: System uses the profile specified in ".awsprofile" directly without mismatch checks or prompts
+- FR39: If the profile in ".awsprofile" does not exist, system warns and clears AWS_PROFILE
+
 ### NonFunctional Requirements
 
 **Performance**
@@ -149,6 +155,11 @@ This document provides the complete epic and story breakdown for labs-aws-profil
 | FR32 | Epic 2 | Hidden credential input |
 | FR33 | Epic 2 | Never display secrets |
 | FR34 | Epic 2 | Direct file writes only |
+| FR35 | Epic 4 | Project .awsprofile auto-switch |
+| FR36 | Epic 4 | Global .awsprofile support in ~/.aws |
+| FR37 | Epic 4 | Use global .awsprofile when project file missing |
+| FR38 | Epic 4 | Direct use of .awsprofile without mismatch prompts |
+| FR39 | Epic 4 | Warn and clear AWS_PROFILE if profile missing |
 
 ## Epic List
 
@@ -163,6 +174,9 @@ Users can add, edit, remove, list, and import AWS profiles without manually edit
 ### Epic 3: Project-Aware Profile Safety
 Users get automatic warnings when their active profile doesn't match the project's expected profile.
 **FRs covered:** FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR25
+### Epic 4: AWS Profile File Improvements
+Users can rely on project and global .awsprofile files to set the correct profile automatically without mismatch prompts.
+**FRs covered:** FR35, FR36, FR37, FR38, FR39
 
 ---
 
@@ -738,3 +752,80 @@ So that awsprof issues never break my terminal session.
 - Error handling in all hook code
 - Defensive programming (check file exists, command exists, etc.)
 - Fast failure paths (NFR3)
+
+## Epic 4: AWS Profile File Improvements
+
+Users can rely on project and global .awsprofile files to set the correct profile automatically without mismatch prompts.
+**FRs covered:** FR35, FR36, FR37, FR38, FR39
+
+
+### Story 4.1: Project .awsprofile Auto-Switch
+
+As an infrastructure developer,
+I want the tool to read a project .awsprofile and immediately switch to that profile when it is valid,
+So that I enter the project already targeting the correct AWS account.
+
+**Acceptance Criteria:**
+
+**Given** the user enters a directory containing a `.awsprofile` file with a valid profile name
+**When** the shell integration hook runs
+**Then** `AWS_PROFILE` is set to that profile without any mismatch prompt
+
+**Given** the `.awsprofile` file contains whitespace around the profile name
+**When** the file is read
+**Then** leading and trailing whitespace are trimmed before use
+
+### Story 4.2: Global .awsprofile Fallback
+
+As an infrastructure developer,
+I want a global `~/.aws/.awsprofile` to define my default profile,
+So that it is used automatically when a project-specific file is absent.
+
+**Acceptance Criteria:**
+
+**Given** there is no project `.awsprofile` in the current directory
+**When** the shell hook runs and a global `~/.aws/.awsprofile` exists
+**Then** the profile in the global file is applied automatically
+**And** `AWS_PROFILE` is set to the global profile without a mismatch prompt
+
+**Given** a project `.awsprofile` exists
+**When** both project and global `.awsprofile` files are present
+**Then** the project file takes precedence over the global file
+
+**Given** neither a project `.awsprofile` nor a global `~/.aws/.awsprofile` exists
+**When** the hook runs
+**Then** no profile is applied and no output is produced
+
+### Story 4.3: Direct Use Without Mismatch Checks
+
+As an infrastructure developer,
+I want the tool to use the profile specified in `.awsprofile` directly,
+So that I no longer see mismatch warnings or switch prompts.
+
+**Acceptance Criteria:**
+
+**Given** a `.awsprofile` file specifies a profile name
+**When** the shell hook evaluates the directory
+**Then** no mismatch warning or prompt is shown
+**And** the specified profile is applied immediately
+
+**Given** the current `AWS_PROFILE` already matches the `.awsprofile` value
+**When** the hook runs
+**Then** no output is produced
+
+### Story 4.4: Missing Profile Handling
+
+As an infrastructure developer,
+I want a clear warning and the active profile cleared when `.awsprofile` points to a non-existent profile,
+So that I do not accidentally run commands against the wrong account.
+
+**Acceptance Criteria:**
+
+**Given** a `.awsprofile` specifies a profile that does not exist in credentials
+**When** the hook evaluates the file
+**Then** a warning is written to stderr indicating the profile does not exist
+**And** `AWS_PROFILE` is cleared (unset or set to empty)
+
+**Given** the profile is later added to credentials
+**When** the hook runs again in the same directory
+**Then** the profile is applied normally

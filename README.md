@@ -321,3 +321,22 @@ Current version: 0.1.1
 - GitHub Repository: https://github.com/kugtong33/labs-aws-profiler
 - Installation Script: https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh
 - Report Issues: https://github.com/kugtong33/labs-aws-profiler/issues
+
+
+- depende on .awsprofile
+  - if there is an existing awsprofile inside a project with a correct profile, switch immediately
+- enable global .awsprofile, put this fine inside ~/.aws
+  - if the directory has no .awsprofile then use global .awsprofile by default
+- remove profile mismatch checks, and use the profile directly set in the .awsprofile
+  - if profile does not exists then throw warning that profile does not exist and set AWS_PROFILE to empty, clear out the profile
+
+
+
+- AWS Profile File Improvements
+- improve how the utility tool handles .awsprofile files
+  1 depende on .awsprofile
+    1.1 if there is an existing awsprofile inside a project with a correct profile, switch immediately
+  2 enable global .awsprofile, put this fine inside ~/.aws
+    2.1 if the directory has no .awsprofile then use global .awsprofile by default
+  3 remove profile mismatch checks, and use the profile directly set in the .awsprofile
+    3.1 if profile does not exists then throw warning that profile does not exist and set AWS_PROFILE to empty, clear out the profile

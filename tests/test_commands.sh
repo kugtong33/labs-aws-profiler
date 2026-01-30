@@ -219,6 +219,44 @@ unset exit_code
 unset stdout
 unset stderr
 
+# Test 15: hook detects valid project .awsprofile and outputs export
+((TESTS_RUN++))
+tmp_dir=$(mktemp -d)
+printf "default\n" > "${tmp_dir}/.awsprofile"
+stderr_file=$(mktemp)
+stdout=$(cd "$tmp_dir" && AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") && exit_code=0 || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+rm -rf "$tmp_dir"
+stdout=${stdout:-}
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "export AWS_PROFILE=default" ]] && [[ -z "$stderr" ]]; then
+    pass "hook outputs export for valid .awsprofile"
+else
+    fail "hook should output export for valid .awsprofile"
+fi
+unset exit_code
+unset stdout
+unset stderr
+
+# Test 16: hook trims whitespace in .awsprofile
+((TESTS_RUN++))
+tmp_dir=$(mktemp -d)
+printf "  default  \n" > "${tmp_dir}/.awsprofile"
+stderr_file=$(mktemp)
+stdout=$(cd "$tmp_dir" && AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") && exit_code=0 || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+rm -rf "$tmp_dir"
+stdout=${stdout:-}
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "export AWS_PROFILE=default" ]] && [[ -z "$stderr" ]]; then
+    pass "hook trims whitespace in .awsprofile"
+else
+    fail "hook should trim whitespace in .awsprofile"
+fi
+unset exit_code
+unset stdout
+unset stderr
+
 # Test 15: whoami performance (<100ms)
 ((TESTS_RUN++))
 start_ns=$(date +%s%N)
@@ -1746,38 +1784,44 @@ else
 fi
 unset output exit_code tmpdir
 
-# Test 104: Warning when profile mismatches
+# Test 104: Auto-switch when profile mismatches
 ((TESTS_RUN++))
 tmpdir=$(mktemp -d)
 echo "production" > "$tmpdir/.awsprofile"
 cd "$tmpdir"
-output=$(AWS_PROFILE="staging" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+stderr_file=$(mktemp)
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" AWS_PROFILE="staging" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
 exit_code=${exit_code:-0}
 cd - > /dev/null
 rm -rf "$tmpdir"
-if [[ "$output" == *"Profile mismatch"* ]] && [[ "$output" == *"staging"* ]] && [[ "$output" == *"production"* ]]; then
-    pass "Warning when profile mismatches"
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "export AWS_PROFILE=production" ]] && [[ -z "$stderr" ]]; then
+    pass "Auto-switch when profile mismatches"
 else
-    fail "Should display mismatch warning (got: '$output')"
+    fail "Should auto-switch on mismatch (stdout: '$stdout', stderr: '$stderr')"
 fi
-unset output exit_code tmpdir
+unset stdout stderr exit_code tmpdir
 
-# Test 105: Unset AWS_PROFILE shown as (none)
+# Test 105: Unset AWS_PROFILE auto-switches
 ((TESTS_RUN++))
 tmpdir=$(mktemp -d)
-echo "expected-profile" > "$tmpdir/.awsprofile"
+echo "default" > "$tmpdir/.awsprofile"
 cd "$tmpdir"
 unset AWS_PROFILE
-output=$("${ROOT_DIR}/awsprof" --hook-detect-profile 2>&1) || exit_code=$?
+stderr_file=$(mktemp)
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
 exit_code=${exit_code:-0}
 cd - > /dev/null
 rm -rf "$tmpdir"
-if [[ "$output" == *"Profile mismatch"* ]] && [[ "$output" == *"(none)"* ]] && [[ "$output" == *"expected-profile"* ]]; then
-    pass "Unset AWS_PROFILE shown as (none)"
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "export AWS_PROFILE=default" ]] && [[ -z "$stderr" ]]; then
+    pass "Unset AWS_PROFILE auto-switches to project profile"
 else
-    fail "Should show (none) for unset AWS_PROFILE (got: '$output')"
+    fail "Should auto-switch when AWS_PROFILE unset (stdout: '$stdout', stderr: '$stderr')"
 fi
-unset output exit_code tmpdir
+unset stdout stderr exit_code tmpdir
 
 # Test 106: Hook handles missing .awsprofile gracefully
 ((TESTS_RUN++))
@@ -1821,12 +1865,13 @@ cat > "$test_script" <<EOF
 export PATH="${ROOT_DIR}:\$PATH"
 eval "\$("${ROOT_DIR}/awsprof" init)"
 tmpdir=\$(mktemp -d)
-echo "expected-profile" > "\$tmpdir/.awsprofile"
-export AWS_PROFILE="wrong-profile"
+echo "production" > "\$tmpdir/.awsprofile"
+export AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock"
+export AWS_PROFILE="staging"
 cd "\$tmpdir" >/dev/null 2>&1
 if [[ "\$PROMPT_COMMAND" == *"awsprof_hook_detect_profile"* ]]; then
-    output=\$(eval "\$PROMPT_COMMAND" 2>&1)
-    if [[ "\$output" == *"Profile mismatch"* ]]; then
+    eval "\$PROMPT_COMMAND" >/dev/null 2>&1
+    if [[ "\$AWS_PROFILE" == "production" ]]; then
         echo "hook_ran"
     fi
 fi

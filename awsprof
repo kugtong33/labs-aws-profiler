@@ -771,7 +771,7 @@ awsprof_prompt_switch_profile() {
 
 awsprof_hook_detect_profile() {
     # Directory change detection hook for PROMPT_COMMAND
-    # Checks for .awsprofile file and warns if profile mismatch detected
+    # Checks for .awsprofile file and applies profile automatically when valid
     # Must complete quickly (under 10ms) and not affect shell performance
 
     # Get expected profile from .awsprofile file (from Story 3.3 helper)
@@ -783,23 +783,20 @@ awsprof_hook_detect_profile() {
         return 0
     fi
 
-    # Get current AWS_PROFILE (default to "(none)" if unset)
-    local current_profile="${AWS_PROFILE:-(none)}"
-
-    # Compare profiles
-    if [[ "$expected_profile" == "$current_profile" ]]; then
-        # Profiles match - silent success (no output)
+    # If already set, no work needed
+    if [[ "${AWS_PROFILE:-}" == "$expected_profile" ]]; then
         return 0
     fi
 
-    # If hook output is silenced, return without printing
-    if [[ "${AWSPROF_SILENT_HOOK:-0}" == "1" ]]; then
+    # Validate profile exists; stay silent on missing credentials or parse errors
+    local profiles
+    profiles=$(awsprof_ini_list_sections 2>/dev/null) || return 0
+    if ! printf '%s\n' "$profiles" | grep -Fxq "$expected_profile"; then
         return 0
     fi
 
-    # Profiles mismatch - display warning message
-    # Use emoji for visibility, show both current and expected
-    awsprof_msg "⚠️  Profile mismatch: current '$current_profile', project expects '$expected_profile'"
+    # Emit eval-safe export to stdout (no stderr noise for valid switches)
+    echo "export AWS_PROFILE=$expected_profile"
 
     return 0
 }
@@ -829,7 +826,7 @@ awsprof_cmd_init() {
 awsprof_hook_detect_profile() {
     # Use resolved awsprof path when available; otherwise no-op to keep shell functional
     if [[ -n "\$awsprof_bin" ]] && [[ -x "\$awsprof_bin" ]]; then
-        "\$awsprof_bin" --hook-detect-profile || true
+        eval "\$("\$awsprof_bin" --hook-detect-profile)" || true
     fi
 }
 
