@@ -1,6 +1,6 @@
 # Story 4.4: Missing Profile Handling
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -87,7 +87,7 @@ so that I avoid accidentally running commands against the wrong account.
 
 ### Story Completion Status
 
-- Status set to `ready-for-dev`
+- Status set to `done`
 
 ## Dev Agent Record
 
@@ -99,10 +99,12 @@ GPT-5 (Codex CLI)
 
 - `bash tests/test_commands.sh`
 - `bash tests/test_ini.sh`
+- `bash tests/test_commands.sh` (post-review fixes)
 ### Completion Notes List
 
 - Added missing-profile warning + clear behavior in hook.
 - Added tests for missing-profile warning/clear and normal behavior after adding profile.
+- Added test coverage for missing credentials and inline comments.
 ### File List
 
 - awsprof
@@ -111,3 +113,4 @@ GPT-5 (Codex CLI)
 ## Change Log
 
 - 2026-01-30: Added missing profile handling and tests.
+- 2026-01-30: Code review fixes for missing-credentials handling and inline comments.

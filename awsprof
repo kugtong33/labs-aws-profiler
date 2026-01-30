@@ -422,6 +422,9 @@ awsprof_util_read_awsprofile_path() {
     while IFS= read -r line || [[ -n "$line" ]]; do
         trimmed="${line#"${line%%[![:space:]]*}"}"
         trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+        trimmed="${trimmed%%[[:space:]]#*}"
+        trimmed="${trimmed%%[[:space:]];*}"
+        trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
         if [[ -z "$trimmed" ]]; then
             continue
         fi
@@ -487,11 +490,6 @@ awsprof_cmd_use() {
     if [[ -n "$extra_arg" ]]; then
         awsprof_error "Too many arguments: expected profile name only"
         awsprof_msg "Usage: awsprof use <profile-name>"
-        return 1
-    fi
-
-    if ! awsprof_util_is_valid_profile_name "$profile_name"; then
-        awsprof_error "Invalid profile name"
         return 1
     fi
 
@@ -832,9 +830,13 @@ awsprof_hook_detect_profile() {
         return 0
     fi
 
-    # Validate profile exists; stay silent on missing credentials or parse errors
+    # Validate profile exists; warn/clear on missing credentials or parse errors
     local profiles
-    profiles=$(awsprof_ini_list_sections 2>/dev/null) || return 0
+    if ! profiles=$(awsprof_ini_list_sections 2>/dev/null); then
+        awsprof_warn "Profile '$expected_profile' not found"
+        printf 'unset AWS_PROFILE\n'
+        return 0
+    fi
     if ! awsprof_util_is_valid_profile_name "$expected_profile"; then
         awsprof_warn "Profile '$expected_profile' not found"
         printf 'unset AWS_PROFILE\n'

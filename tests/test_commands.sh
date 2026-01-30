@@ -1978,6 +1978,25 @@ else
 fi
 unset stdout stderr exit_code tmpdir
 
+# Test 106d0: Missing credentials file still warns and clears AWS_PROFILE
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+echo "missing-profile" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+stderr_file=$(mktemp)
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="/nonexistent/file.ini" AWS_PROFILE="staging" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "unset AWS_PROFILE" ]] && [[ "$stderr" == *"not found"* ]]; then
+    pass "Missing credentials file warns and clears AWS_PROFILE"
+else
+    fail "Missing credentials file should warn/clear (stdout: '$stdout', stderr: '$stderr')"
+fi
+unset stdout stderr exit_code tmpdir
+
 # Test 106d2: Invalid global profile name warns and clears AWS_PROFILE
 ((TESTS_RUN++))
 tmpdir=$(mktemp -d)
@@ -1998,6 +2017,25 @@ else
     fail "Invalid global .awsprofile should warn and clear (stdout: '$stdout', stderr: '$stderr')"
 fi
 unset stdout stderr exit_code tmpdir home_dir
+
+# Test 106d3: Inline comment in .awsprofile is ignored
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+printf "staging # comment\n" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+stderr_file=$(mktemp)
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "export AWS_PROFILE=staging" ]] && [[ -z "$stderr" ]]; then
+    pass "Inline comments in .awsprofile are ignored"
+else
+    fail "Inline comments should be ignored (stdout: '$stdout', stderr: '$stderr')"
+fi
+unset stdout stderr exit_code tmpdir
 
 # Test 106e: Missing profile then added switches normally
 ((TESTS_RUN++))
