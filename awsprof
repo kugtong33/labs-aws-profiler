@@ -402,6 +402,8 @@ awsprof_ini_delete_section() {
 # awsprof_util_read_awsprofile_path - Read .awsprofile file from provided path
 # awsprof_util_read_awsprofile - Read .awsprofile file from current directory
 # awsprof_util_read_global_awsprofile - Read global .awsprofile file from ~/.aws
+#
+# awsprof_util_is_valid_profile_name - Validate profile name for shell-safe export
 
 awsprof_util_read_awsprofile_path() {
     local profile_file="$1"
@@ -420,6 +422,12 @@ awsprof_util_read_awsprofile_path() {
     while IFS= read -r line || [[ -n "$line" ]]; do
         trimmed="${line#"${line%%[![:space:]]*}"}"
         trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+        if [[ -z "$trimmed" ]]; then
+            continue
+        fi
+        if [[ "$trimmed" == \#* ]] || [[ "$trimmed" == \;* ]]; then
+            continue
+        fi
         if [[ -n "$trimmed" ]]; then
             printf '%s\n' "$trimmed"
             break
@@ -435,6 +443,11 @@ awsprof_util_read_awsprofile() {
 
 awsprof_util_read_global_awsprofile() {
     awsprof_util_read_awsprofile_path "$HOME/.aws/.awsprofile"
+}
+
+awsprof_util_is_valid_profile_name() {
+    local profile_name="$1"
+    [[ "$profile_name" =~ ^[A-Za-z0-9._-]+$ ]]
 }
 
 #=== PROFILE COMMANDS ===
@@ -477,6 +490,11 @@ awsprof_cmd_use() {
         return 1
     fi
 
+    if ! awsprof_util_is_valid_profile_name "$profile_name"; then
+        awsprof_error "Invalid profile name"
+        return 1
+    fi
+
     # Validate profile exists
     local profiles
     profiles=$(awsprof_ini_list_sections) || return 1
@@ -487,7 +505,7 @@ awsprof_cmd_use() {
     fi
 
     # Output eval code to stdout
-    echo "export AWS_PROFILE=$profile_name"
+    printf 'export AWS_PROFILE=%q\n' "$profile_name"
 
     # Output success message to stderr
     awsprof_success "Switched to profile: $profile_name"
@@ -817,14 +835,19 @@ awsprof_hook_detect_profile() {
     # Validate profile exists; stay silent on missing credentials or parse errors
     local profiles
     profiles=$(awsprof_ini_list_sections 2>/dev/null) || return 0
+    if ! awsprof_util_is_valid_profile_name "$expected_profile"; then
+        awsprof_warn "Profile '$expected_profile' not found"
+        printf 'unset AWS_PROFILE\n'
+        return 0
+    fi
     if ! printf '%s\n' "$profiles" | grep -Fxq "$expected_profile"; then
         awsprof_warn "Profile '$expected_profile' not found"
-        echo "unset AWS_PROFILE"
+        printf 'unset AWS_PROFILE\n'
         return 0
     fi
 
     # Emit eval-safe export to stdout (no stderr noise for valid switches)
-    echo "export AWS_PROFILE=$expected_profile"
+    printf 'export AWS_PROFILE=%q\n' "$expected_profile"
 
     return 0
 }

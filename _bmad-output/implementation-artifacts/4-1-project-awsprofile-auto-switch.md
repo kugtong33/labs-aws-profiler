@@ -1,6 +1,6 @@
 # Story 4.1: Project .awsprofile Auto-Switch
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -105,12 +105,15 @@ GPT-5 (Codex CLI)
 ### Debug Log References
 
 - `bash tests/test_commands.sh`
+- `bash tests/test_commands.sh` (post-review fixes)
 ### Completion Notes List
 
 - Implemented auto-switch for valid project `.awsprofile` via hook export output.
 - Updated bash init hook to eval hook output.
 - Added tests for hook auto-switch and whitespace trimming; all command tests pass.
 - Ultimate context engine analysis completed - comprehensive developer guide created
+- Hardened hook and use output with `printf` and safe profile validation to prevent eval injection.
+- `.awsprofile` parser now skips comment-only lines.
 ### File List
 
 - awsprof
@@ -119,3 +122,4 @@ GPT-5 (Codex CLI)
 ## Change Log
 
 - 2026-01-30: Implemented project `.awsprofile` auto-switch and updated hook/init tests.
+- 2026-01-30: Code review fixes for safe export output and comment handling.

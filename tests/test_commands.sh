@@ -1882,6 +1882,44 @@ else
 fi
 unset stdout stderr exit_code tmpdir home_dir
 
+# Test 106c2: .awsprofile skips comment lines
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+printf "# comment only\nstaging\n" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+stderr_file=$(mktemp)
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ $exit_code -eq 0 ]] && [[ "$stdout" == "export AWS_PROFILE=staging" ]] && [[ -z "$stderr" ]]; then
+    pass ".awsprofile skips comment lines"
+else
+    fail "Should skip comments in .awsprofile (stdout: '$stdout', stderr: '$stderr')"
+fi
+unset stdout stderr exit_code tmpdir
+
+# Test 106c3: .awsprofile with only comments is silent
+((TESTS_RUN++))
+tmpdir=$(mktemp -d)
+printf "# comment only\n" > "$tmpdir/.awsprofile"
+cd "$tmpdir"
+stderr_file=$(mktemp)
+stdout=$(AWS_SHARED_CREDENTIALS_FILE="${SCRIPT_DIR}/fixtures/credentials.mock" "${ROOT_DIR}/awsprof" --hook-detect-profile 2>"$stderr_file") || exit_code=$?
+stderr=$(cat "$stderr_file")
+rm -f "$stderr_file"
+exit_code=${exit_code:-0}
+cd - > /dev/null
+rm -rf "$tmpdir"
+if [[ $exit_code -eq 0 ]] && [[ -z "$stdout" ]] && [[ -z "$stderr" ]]; then
+    pass ".awsprofile comments-only is silent"
+else
+    fail "Comments-only .awsprofile should be silent (stdout: '$stdout', stderr: '$stderr')"
+fi
+unset stdout stderr exit_code tmpdir
+
 # Test 106d: Missing profile warns and clears AWS_PROFILE
 ((TESTS_RUN++))
 tmpdir=$(mktemp -d)
