@@ -17,9 +17,9 @@ This document provides the complete epic and story breakdown for labs-aws-profil
 ### Functional Requirements
 
 **Profile Management**
-- FR1: User can add a new AWS profile by providing a name, access key ID, and secret access key
-- FR2: User can edit an existing profile's credentials (access key ID and secret access key)
-- FR3: User can remove an existing profile from the system
+- FR1: User can add a new AWS profile by providing a name, access key ID, secret access key, region, and output format
+- FR2: User can edit an existing profile's credentials and config defaults (access key ID, secret access key, region, output)
+- FR3: User can remove an existing profile from the system (credentials and config)
 - FR4: User can view a list of all configured AWS profiles
 - FR5: System stores profile credentials in standard `~/.aws/credentials` format
 - FR6: System preserves existing profiles when adding or editing (no data loss)
@@ -71,6 +71,12 @@ This document provides the complete epic and story breakdown for labs-aws-profil
 - FR37: If no project ".awsprofile" exists, system uses the global ".awsprofile" by default
 - FR38: System uses the profile specified in ".awsprofile" directly without mismatch checks or prompts
 - FR39: If the profile in ".awsprofile" does not exist, system warns and clears AWS_PROFILE
+
+**AWS Config Support**
+- FR40: User can set a default AWS region for a profile (writes to `~/.aws/config`)
+- FR41: User can set a default AWS output format for a profile (writes to `~/.aws/config`)
+- FR42: User can view the current region/output for a profile (reads from `~/.aws/config`)
+- FR43: System preserves existing config entries when adding or editing config settings
 
 ### NonFunctional Requirements
 
@@ -160,6 +166,10 @@ This document provides the complete epic and story breakdown for labs-aws-profil
 | FR37 | Epic 4 | Use global .awsprofile when project file missing |
 | FR38 | Epic 4 | Direct use of .awsprofile without mismatch prompts |
 | FR39 | Epic 4 | Warn and clear AWS_PROFILE if profile missing |
+| FR40 | Epic 5 | Set default AWS region for a profile |
+| FR41 | Epic 5 | Set default AWS output format for a profile |
+| FR42 | Epic 5 | View region/output for a profile |
+| FR43 | Epic 5 | Preserve existing config entries when editing |
 
 ## Epic List
 
@@ -361,30 +371,37 @@ So that I never lose data when modifying profiles.
 ### Story 2.2: Add New Profile
 
 As an infrastructure developer,
-I want to add a new AWS profile with credentials,
+I want to add a new AWS profile with credentials and config defaults,
 So that I can configure access to a new AWS account without manual file editing.
 
 **Acceptance Criteria:**
 
 **Given** the user runs `awsprof add newclient-staging`
-**When** the command prompts for credentials
+**When** the command prompts for inputs
 **Then** the Access Key ID prompt is displayed
 **And** the Secret Access Key prompt is displayed with hidden input (no terminal echo) (FR32, NFR5)
-**And** both values are captured securely
+**And** the Region prompt is displayed
+**And** the Output format prompt is displayed
+**And** all values are captured securely
+**And** blank region or output inputs result in those config keys being omitted (leave unset)
 
 **Given** the user provides valid credentials
 **When** the profile is saved
 **Then** the profile is written to `~/.aws/credentials` in standard INI format (FR5)
 **And** the format is `[newclient-staging]` section with `aws_access_key_id` and `aws_secret_access_key` keys
+**And** the profile config is written to `~/.aws/config` in standard INI format with `[profile newclient-staging]` (FR40, FR41)
+**And** the config includes `region` and `output` keys
 **And** a timestamped backup is created before writing (NFR11)
 **And** the file permissions are set to 600 (NFR8)
 **And** the secret key is never displayed in output (FR33, NFR6)
 **And** credentials are written directly to file without intermediate storage (FR34)
+**And** config entries are written directly to file without intermediate storage
 
 **Given** existing profiles already exist in the credentials file
 **When** a new profile is added
 **Then** all existing profiles are preserved (FR6)
 **And** the new profile is appended correctly
+**And** existing config entries are preserved (FR43)
 
 **Given** a profile with the same name already exists
 **When** the user attempts to add it
@@ -394,6 +411,12 @@ So that I can configure access to a new AWS account without manual file editing.
 **Given** the user provides invalid credential format
 **When** validation is performed
 **Then** the invalid credentials are rejected (FR31)
+**And** a clear error message explains the issue
+**And** the command exits with status code 1
+
+**Given** the user provides an unsupported output format
+**When** validation is performed
+**Then** the output format is rejected
 **And** a clear error message explains the issue
 **And** the command exits with status code 1
 
@@ -407,7 +430,7 @@ So that I can configure access to a new AWS account without manual file editing.
 ### Story 2.3: Edit Existing Profile
 
 As an infrastructure developer,
-I want to update credentials for an existing profile,
+I want to update credentials and config defaults for an existing profile,
 So that I can rotate keys without losing the profile configuration.
 
 **Acceptance Criteria:**
@@ -416,13 +439,19 @@ So that I can rotate keys without losing the profile configuration.
 **When** the user runs `awsprof edit client-acme`
 **Then** the command prompts for new Access Key ID
 **And** prompts for new Secret Access Key with hidden input (FR32, NFR5)
+**And** prompts for Region
+**And** prompts for Output format
 **And** updates the profile in `~/.aws/credentials` (FR2)
+**And** updates the profile in `~/.aws/config` (FR40, FR41)
+**And** blank region or output inputs result in those config keys being omitted (leave unset)
 
 **Given** the user provides new credentials
 **When** the profile is updated
 **Then** a timestamped backup is created first (NFR11)
 **And** only the specified profile's credentials are changed (FR6)
 **And** all other profiles remain unchanged
+**And** only the specified profile's config entries are changed
+**And** all other config entries remain unchanged
 **And** file permissions are set to 600 (NFR8)
 **And** the secret key is never displayed (FR33, NFR6)
 
@@ -437,6 +466,12 @@ So that I can rotate keys without losing the profile configuration.
 **And** the original profile remains unchanged
 **And** a clear error message is shown
 
+**Given** the user provides an unsupported output format
+**When** validation occurs
+**Then** the output format is rejected
+**And** the original profile remains unchanged
+**And** a clear error message is shown
+
 **Technical Requirements:**
 - Implements FR2, FR6, FR31, FR32, FR33
 - Uses INI writing and backup from Story 2.1
@@ -447,7 +482,7 @@ So that I can rotate keys without losing the profile configuration.
 ### Story 2.4: Remove Profile
 
 As an infrastructure developer,
-I want to delete a profile I no longer use,
+I want to delete a profile I no longer use along with its config defaults,
 So that my credentials file stays clean and manageable.
 
 **Acceptance Criteria:**
@@ -455,8 +490,10 @@ So that my credentials file stays clean and manageable.
 **Given** a profile named "old-client" exists
 **When** the user runs `awsprof remove old-client`
 **Then** a timestamped backup is created (NFR11)
-**And** the `[old-client]` section and its credentials are removed from the file (FR3)
+**And** the `[old-client]` section and its credentials are removed from the credentials file (FR3)
+**And** the `[profile old-client]` section is removed from the config file
 **And** all other profiles are preserved (FR6)
+**And** all other config entries are preserved (FR43)
 **And** file permissions remain 600 (NFR8)
 
 **Given** the user attempts to remove a non-existent profile "foo"
@@ -829,3 +866,138 @@ So that I do not accidentally run commands against the wrong account.
 **Given** the profile is later added to credentials
 **When** the hook runs again in the same directory
 **Then** the profile is applied normally
+
+---
+
+## Epic 5: AWS Config Support
+
+Users can manage AWS config settings (region and output) alongside profiles so their CLI behavior is consistent and discoverable.
+
+**Proposed FR coverage (new):**
+- FR40: User can set a default AWS region for a profile (writes to `~/.aws/config`)
+- FR41: User can set a default AWS output format for a profile (writes to `~/.aws/config`)
+- FR42: User can view the current region/output for a profile (reads from `~/.aws/config`)
+- FR43: System preserves existing config entries when adding or editing config settings
+
+### Story 5.1: Read AWS Config Defaults
+
+As an infrastructure developer,
+I want awsprof to read region and output settings from `~/.aws/config`,
+So that I can see what defaults apply to each profile.
+
+**Acceptance Criteria:**
+
+**Given** a `~/.aws/config` file exists with `[profile client-acme]` entries
+**When** awsprof reads config settings for that profile
+**Then** it returns the `region` and `output` values if present (FR42)
+**And** it handles profiles without those keys gracefully
+
+**Given** a default profile section `[default]` exists
+**When** awsprof reads config settings for the default profile
+**Then** it returns values from `[default]` (FR42)
+
+**Given** the config file does not exist
+**When** config settings are requested
+**Then** awsprof reports "No config file found at ~/.aws/config" to stderr
+**And** exits with status code 0 (informational)
+
+**Technical Requirements:**
+- Reads AWS config file format (profile sections are `profile NAME`, default is `[default]`)
+- Uses awk-based parsing (Architecture)
+- Messages to stderr, data to stdout
+
+---
+
+### Story 5.2: Set Region for Profile
+
+As an infrastructure developer,
+I want to set a default AWS region for a profile,
+So that AWS CLI commands automatically target the correct region.
+
+**Acceptance Criteria:**
+
+**Given** the user runs `awsprof config set-region client-acme us-east-1`
+**When** the command executes
+**Then** `~/.aws/config` contains or updates `[profile client-acme]` with `region = us-east-1` (FR40)
+**And** existing config entries are preserved (FR43)
+**And** the command exits with status code 0
+
+**Given** the user sets a region for the default profile
+**When** the command executes
+**Then** `[default]` is updated with `region = ...` (FR40)
+
+**Given** the config file does not exist
+**When** the region is set
+**Then** the file is created with correct INI format (FR40)
+**And** permissions are set to 600
+
+**Given** the user provides an invalid region format
+**When** validation occurs
+**Then** no region validation is performed (any non-empty value is accepted)
+**And** the command exits with status code 0
+
+**Technical Requirements:**
+- Writes to `~/.aws/config` with atomic temp + mv pattern
+- Creates timestamped backups before modifying existing config
+- Preserves unrelated sections and keys
+
+---
+
+### Story 5.3: Set Output Format for Profile
+
+As an infrastructure developer,
+I want to set a default AWS output format for a profile,
+So that CLI outputs are consistent (json, text, table).
+
+**Acceptance Criteria:**
+
+**Given** the user runs `awsprof config set-output client-acme json`
+**When** the command executes
+**Then** `~/.aws/config` contains or updates `[profile client-acme]` with `output = json` (FR41)
+**And** existing config entries are preserved (FR43)
+**And** the command exits with status code 0
+
+**Given** the user sets output for the default profile
+**When** the command executes
+**Then** `[default]` is updated with `output = ...` (FR41)
+
+**Given** the user provides an unsupported output format
+**When** validation occurs
+**Then** a clear error message is displayed to stderr
+**And** the command exits with status code 1
+**And** only these formats are accepted: `json`, `text`, `table`
+
+**Technical Requirements:**
+- Writes to `~/.aws/config` with atomic temp + mv pattern
+- Creates timestamped backups before modifying existing config
+- Preserves unrelated sections and keys
+
+---
+
+### Story 5.4: Show Profile Config Summary
+
+As an infrastructure developer,
+I want to view the region and output configured for a profile,
+So that I can quickly confirm defaults without opening the file.
+
+**Acceptance Criteria:**
+
+**Given** the user runs `awsprof config show client-acme`
+**When** the command executes
+**Then** the current `region` and `output` are displayed if set (FR42)
+**And** missing values are displayed as "not set" (or similar)
+**And** the command exits with status code 0
+
+**Given** the user requests the default profile
+**When** the command executes
+**Then** values are read from `[default]` (FR42)
+
+**Given** the config file is malformed
+**When** the command executes
+**Then** a clear error is displayed to stderr
+**And** the command exits with status code 1
+
+**Technical Requirements:**
+- Read-only operation
+- Data to stdout, messages to stderr
+- Fast execution (<100ms)

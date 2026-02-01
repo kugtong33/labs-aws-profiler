@@ -34,6 +34,7 @@ author: Ubuntu
 - Profile CRUD (add, edit, remove, list, import)
 - Instant switching via `AWS_PROFILE` environment variable
 - Project-profile linking with mismatch warnings
+- AWS config defaults (region/output) per profile
 
 **Technical Context:** Linux CLI tool, bash/sh compatible, uses standard AWS credential files.
 
@@ -74,9 +75,9 @@ N/A - Personal open-source utility. Success is measured by personal utility, not
 ### MVP - Minimum Viable Product
 
 **Profile Management:**
-- `awsprof add <name>` - Add profile with access key and secret
-- `awsprof edit <name>` - Edit existing profile credentials
-- `awsprof remove <name>` - Delete a profile
+- `awsprof add <name>` - Add profile with access key, secret, region, and output (prompts for all)
+- `awsprof edit <name>` - Edit existing profile credentials and config defaults (prompts for all)
+- `awsprof remove <name>` - Delete a profile and its config defaults
 - `awsprof list` - Show all available profiles
 - `awsprof import` - Import existing profiles from `~/.aws/credentials`
 
@@ -88,6 +89,11 @@ N/A - Personal open-source utility. Success is measured by personal utility, not
 - `.awsprofile` file in project directory
 - Mismatch warning when current profile differs from project's linked profile
 - Prompt to switch when mismatched
+
+**AWS Config Support:**
+- `awsprof config set-region <name> <region>` - Set default region for a profile
+- `awsprof config set-output <name> <format>` - Set default output format for a profile
+- `awsprof config show <name>` - Show region/output for a profile
 
 ### Growth Features (Post-MVP)
 
@@ -206,13 +212,16 @@ labs-aws-profiler is a command-line interface tool designed for terminal-native 
 
 | Command | Arguments | Description |
 |---------|-----------|-------------|
-| `awsprof add <name>` | Profile name | Add new profile (prompts for credentials) |
-| `awsprof edit <name>` | Profile name | Edit existing profile credentials |
-| `awsprof remove <name>` | Profile name | Delete a profile |
+| `awsprof add <name>` | Profile name | Add new profile (prompts for credentials, region, output) |
+| `awsprof edit <name>` | Profile name | Edit existing profile credentials and config defaults |
+| `awsprof remove <name>` | Profile name | Delete a profile and its config defaults |
 | `awsprof list` | None | Display all available profiles |
 | `awsprof import` | None | Import profiles from existing `~/.aws/credentials` |
 | `awsprof use <name>` | Profile name | Switch to profile (sets `AWS_PROFILE`) |
 | `awsprof whoami` | None | Display currently active profile |
+| `awsprof config set-region <name> <region>` | Profile name, region | Set default AWS region for a profile |
+| `awsprof config set-output <name> <format>` | Profile name, output format | Set default AWS output format for a profile |
+| `awsprof config show <name>` | Profile name | Show region/output for a profile |
 
 ### Output Formats
 
@@ -237,6 +246,11 @@ labs-aws-profiler is a command-line interface tool designed for terminal-native 
 **No Global Tool Config:**
 - No `~/.awsprofrc` or similar in MVP
 - Tool behavior is consistent across all usage
+
+**Config Defaults Behavior:**
+- `awsprof add` and `awsprof edit` always prompt for region and output
+- If the user submits a blank value, the corresponding config key is omitted (leave unset)
+- Output format is validated to supported values (json, text, table)
 
 ### Scripting Support
 
@@ -289,15 +303,18 @@ labs-aws-profiler is a command-line interface tool designed for terminal-native 
 
 | Capability | Rationale |
 |------------|-----------|
-| `awsprof add` | Create new profiles |
-| `awsprof edit` | Modify existing credentials |
-| `awsprof remove` | Clean up unused profiles |
+| `awsprof add` | Create new profiles (credentials + config defaults) |
+| `awsprof edit` | Modify existing credentials and config defaults |
+| `awsprof remove` | Clean up unused profiles and config defaults |
 | `awsprof list` | See all available profiles |
 | `awsprof import` | Onboard existing AWS users |
 | `awsprof use` | Core switching functionality |
 | `awsprof whoami` | Visibility into current state |
 | `.awsprofile` detection | Project-profile linking |
 | Mismatch warning | Safety net (non-intrusive) |
+| `awsprof config set-region` | Set default region per profile |
+| `awsprof config set-output` | Set default output per profile |
+| `awsprof config show` | View region/output defaults |
 
 **Shell Integration Philosophy:**
 - Warn on mismatch, don't block
@@ -336,9 +353,9 @@ labs-aws-profiler is a command-line interface tool designed for terminal-native 
 
 ### Profile Management
 
-- FR1: User can add a new AWS profile by providing a name, access key ID, and secret access key
-- FR2: User can edit an existing profile's credentials (access key ID and secret access key)
-- FR3: User can remove an existing profile from the system
+- FR1: User can add a new AWS profile by providing a name, access key ID, secret access key, region, and output format
+- FR2: User can edit an existing profile's credentials and config defaults (access key ID, secret access key, region, output)
+- FR3: User can remove an existing profile from the system (credentials and config)
 - FR4: User can view a list of all configured AWS profiles
 - FR5: System stores profile credentials in standard `~/.aws/credentials` format
 - FR6: System preserves existing profiles when adding or editing (no data loss)
@@ -391,6 +408,13 @@ labs-aws-profiler is a command-line interface tool designed for terminal-native 
 - FR32: System prompts for credentials with hidden input (no terminal echo)
 - FR33: System never displays secret access keys in output
 - FR34: System writes credentials directly to file (no intermediate storage)
+
+### AWS Config Support
+
+- FR40: User can set a default AWS region for a profile (writes to `~/.aws/config`)
+- FR41: User can set a default AWS output format for a profile (writes to `~/.aws/config`)
+- FR42: User can view the current region/output for a profile (reads from `~/.aws/config`)
+- FR43: System preserves existing config entries when adding or editing config settings
 
 ## Non-Functional Requirements
 

@@ -18,7 +18,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 ### Requirements Overview
 
 **Functional Requirements:**
-34 FRs across 8 capability areas:
+43 FRs across 9 capability areas:
 - **Profile Management (FR1-6):** CRUD operations for AWS profiles in `~/.aws/credentials`
 - **Profile Import (FR7-9):** Parse and import existing credential files
 - **Profile Switching (FR10-13):** Set `AWS_PROFILE` environment variable
@@ -27,6 +27,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 - **Shell Integration (FR23-26):** Provide shell scripts for bash/sh, enable directory change detection
 - **Error Handling (FR27-31):** Exit codes, validation, clear error messages
 - **Credential Security (FR32-34):** Hidden input, no secret display, direct file writes
+- **AWS Config Support (FR40-43):** Manage region/output defaults in `~/.aws/config`
 
 **Non-Functional Requirements:**
 17 NFRs driving architectural decisions:
@@ -129,7 +130,7 @@ labs-aws-profiler/
 - Or minimal awk for complex parsing if needed
 
 **Argument Parsing:**
-- Manual case/getopts pattern (simple enough for 7 commands)
+- Manual case/getopts pattern (simple enough for ~10 commands)
 - No framework needed
 
 **Testing:**
@@ -164,7 +165,7 @@ labs-aws-profiler/
 |----------|--------|-----------|
 | INI Parsing | awk-based | Fast, reliable, available everywhere, handles sections cleanly |
 | INI Writing | awk for transforms | Preserve formatting, atomic updates |
-| Backup Strategy | Copy before modify | Simple `.bak` file before any credential file changes |
+| Backup Strategy | Copy before modify | Simple `.bak` file before any credential or config file changes |
 
 **Implementation Pattern:**
 ```bash
@@ -335,15 +336,20 @@ awsprof_cmd_use() {
 
 **Backup Strategy:**
 - Pattern: Timestamped backups
-- Format: `credentials.bak.YYYYMMDD-HHMMSS`
+- Format: `credentials.bak.YYYYMMDD-HHMMSS` / `config.bak.YYYYMMDD-HHMMSS`
 - Location: Same directory as original
-- Example: `~/.aws/credentials.bak.20260122-143052`
+- Example: `~/.aws/credentials.bak.20260122-143052`, `~/.aws/config.bak.20260122-143052`
 
 **Backup Function:**
 ```bash
 awsprof_backup_credentials() {
     local timestamp=$(date +%Y%m%d-%H%M%S)
     cp ~/.aws/credentials ~/.aws/credentials.bak.$timestamp
+}
+
+awsprof_backup_config() {
+    local timestamp=$(date +%Y%m%d-%H%M%S)
+    cp ~/.aws/config ~/.aws/config.bak.$timestamp
 }
 ```
 
@@ -356,6 +362,14 @@ awsprof_write_credentials() {
     mv "$temp_file" ~/.aws/credentials
     chmod 600 ~/.aws/credentials
 }
+
+awsprof_write_config() {
+    local temp_file=$(mktemp)
+    # Write to temp file...
+    awsprof_backup_config
+    mv "$temp_file" ~/.aws/config
+    chmod 600 ~/.aws/config
+}
 ```
 
 ### Enforcement Guidelines
@@ -366,7 +380,8 @@ awsprof_write_credentials() {
 - Send user messages to stderr
 - Send eval code to stdout only
 - Create timestamped backup before any credential file modification
-- Use `chmod 600` on credential files after writing
+- Create timestamped backup before any config file modification
+- Use `chmod 600` on credential and config files after writing
 
 **Anti-Patterns to Avoid:**
 - `echo "Switched"` (stdout pollutes eval)
@@ -425,7 +440,9 @@ AWSPROF_EMOJI="${AWSPROF_EMOJI:-0}"
 
 #=== FILE OPERATIONS ===
 # awsprof_backup_credentials
+# awsprof_backup_config
 # awsprof_write_credentials
+# awsprof_write_config
 
 #=== PROFILE COMMANDS ===
 # awsprof_cmd_add
@@ -435,12 +452,15 @@ AWSPROF_EMOJI="${AWSPROF_EMOJI:-0}"
 # awsprof_cmd_import
 # awsprof_cmd_use
 # awsprof_cmd_whoami
+# awsprof_cmd_config_set_region
+# awsprof_cmd_config_set_output
+# awsprof_cmd_config_show
 
 #=== SHELL INTEGRATION ===
 # awsprof_cmd_init (outputs shell code for sourcing)
 
 #=== MAIN DISPATCH ===
-# case "$1" in add|edit|remove|list|import|use|whoami|init|help) ...
+# case "$1" in add|edit|remove|list|import|use|whoami|init|config|help) ...
 ```
 
 ### Architectural Boundaries
@@ -452,6 +472,7 @@ Each command is a self-contained function that:
 - Returns exit code 0 or 1
 - Outputs eval code to stdout (for `use` only)
 - Outputs messages to stderr
+ - Treats profile data as credentials + config defaults for add/edit/remove
 
 **File Boundary:**
 ```
@@ -489,6 +510,7 @@ User's System                    awsprof
 | Shell Integration (FR23-26) | `awsprof_cmd_init` + PROMPT_COMMAND |
 | Error Handling (FR27-31) | `#=== OUTPUT UTILITIES ===` |
 | Credential Security (FR32-34) | `awsprof_cmd_add`, `awsprof_cmd_edit` |
+| AWS Config Support (FR40-43) | `awsprof_cmd_config_*` |
 
 ### Installation Structure
 
