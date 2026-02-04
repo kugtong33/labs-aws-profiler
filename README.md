@@ -156,10 +156,12 @@ Link a project directory to a specific AWS profile by creating a `.awsprofile` f
 echo "client-acme" > .awsprofile
 ```
 
-2. **Automatic detection**: When you `cd` into this directory, `awsprof` will:
+2. **Automatic detection**: When you `cd` into a git repo, `awsprof` will:
    - Detect if you're using a different profile
    - Warn you about the mismatch
    - Prompt you to switch (optional)
+
+`awsprof` searches upward from your current directory to the git repo root for the nearest `.awsprofile`. If you are not inside a git repo, only the global `~/.aws/.awsprofile` is used (no upward search).
 
 Example:
 ```bash
@@ -180,7 +182,7 @@ The `.awsprofile` file is safe to commit to version control since it only contai
 | `awsprof edit <profile>` | Edit an existing AWS profile |
 | `awsprof remove <profile>` | Remove an AWS profile |
 | `awsprof import` | Import profiles from credentials file |
-| `awsprof check` | Check `.awsprofile` file in current directory |
+| `awsprof check` | Check nearest `.awsprofile` in git repo (or empty if none) |
 | `awsprof init` | Initialize shell integration (use with eval) |
 | `awsprof help` | Show help message |
 
@@ -191,7 +193,7 @@ The `.awsprofile` file is safe to commit to version control since it only contai
 When you run `eval "$(awsprof init)"`, awsprof adds:
 
 1. **A wrapper function** that intercepts `awsprof use` commands and evaluates their output to set environment variables
-2. **A PROMPT_COMMAND hook** that checks for `.awsprofile` files when you change directories
+2. **A PROMPT_COMMAND hook** that checks for `.awsprofile` files when you change directories (within a git repo)
 3. **Profile detection** that warns you when there's a mismatch
 
 ### Environment Variables

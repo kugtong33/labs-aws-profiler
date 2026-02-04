@@ -400,7 +400,7 @@ awsprof_ini_delete_section() {
 
 #=== UTILITY FUNCTIONS ===
 # awsprof_util_read_awsprofile_path - Read .awsprofile file from provided path
-# awsprof_util_read_awsprofile - Read .awsprofile file from current directory
+# awsprof_util_read_awsprofile - Read nearest .awsprofile within git repo
 # awsprof_util_read_global_awsprofile - Read global .awsprofile file from ~/.aws
 #
 # awsprof_util_is_valid_profile_name - Validate profile name for shell-safe export
@@ -441,7 +441,34 @@ awsprof_util_read_awsprofile_path() {
 }
 
 awsprof_util_read_awsprofile() {
-    awsprof_util_read_awsprofile_path "./.awsprofile"
+    local dir="$PWD"
+    local found_profile=""
+
+    if [[ -e "./.git" && -f "./.awsprofile" ]]; then
+        awsprof_util_read_awsprofile_path "./.awsprofile"
+        return 0
+    fi
+
+    while :; do
+        if [[ -z "$found_profile" && -f "$dir/.awsprofile" ]]; then
+            found_profile="$dir/.awsprofile"
+        fi
+        if [[ -e "$dir/.git" ]]; then
+            if [[ -n "$found_profile" ]]; then
+                awsprof_util_read_awsprofile_path "$found_profile"
+            fi
+            return 0
+        fi
+        if [[ "$dir" == "/" ]]; then
+            break
+        fi
+        dir="${dir%/*}"
+        if [[ -z "$dir" ]]; then
+            dir="/"
+        fi
+    done
+
+    return 0
 }
 
 awsprof_util_read_global_awsprofile() {
