@@ -41,12 +41,13 @@ awsprof_success() {
 # awsprof_ini_list_sections - List all profile sections from credentials file
 # awsprof_ini_read_section - Read key-value pairs from a specific section
 
-awsprof_ini_list_sections() {
-    local file="${1:-$_awsprof_credentials}"
+awsprof_ini_list_sections_from_file() {
+    local file="$1"
+    local label="$2"
 
     # Check if file exists
     if [[ ! -f "$file" ]]; then
-        awsprof_error "Credentials file not found: $file"
+        awsprof_error "${label} file not found: $file"
         return 1
     fi
 
@@ -70,7 +71,7 @@ awsprof_ini_list_sections() {
     fi
     if [[ $awk_status -ne 0 ]]; then
         if [[ $awk_status -ne 2 ]]; then
-            awsprof_error "Failed to parse credentials file: $file"
+            awsprof_error "Failed to parse ${label,,} file: $file"
         fi
         return 1
     fi
@@ -78,13 +79,14 @@ awsprof_ini_list_sections() {
     return 0
 }
 
-awsprof_ini_read_section() {
+awsprof_ini_read_section_from_file() {
     local section="$1"
-    local file="${2:-$_awsprof_credentials}"
+    local file="$2"
+    local label="$3"
 
     # Check if file exists
     if [[ ! -f "$file" ]]; then
-        awsprof_error "Credentials file not found: $file"
+        awsprof_error "${label} file not found: $file"
         return 1
     fi
 
@@ -134,23 +136,46 @@ awsprof_ini_read_section() {
     return 0
 }
 
+awsprof_ini_list_sections() {
+    local file="${1:-$_awsprof_credentials}"
+    awsprof_ini_list_sections_from_file "$file" "Credentials"
+}
+
+awsprof_ini_read_section() {
+    local section="$1"
+    local file="${2:-$_awsprof_credentials}"
+    awsprof_ini_read_section_from_file "$section" "$file" "Credentials"
+}
+
+awsprof_config_list_sections() {
+    local file="${1:-$_awsprof_config}"
+    awsprof_ini_list_sections_from_file "$file" "Config"
+}
+
+awsprof_config_read_section() {
+    local section="$1"
+    local file="${2:-$_awsprof_config}"
+    awsprof_ini_read_section_from_file "$section" "$file" "Config"
+}
+
 #=== FILE OPERATIONS ===
 # awsprof_backup_credentials - Create timestamped backup of credentials file
 # awsprof_ini_write_section - Write or update a section in INI file
 # awsprof_ini_delete_section - Delete a section from INI file
 
-awsprof_backup_credentials() {
-    # Use AWS_SHARED_CREDENTIALS_FILE if set, otherwise default
-    local file="${1:-${AWS_SHARED_CREDENTIALS_FILE:-$_awsprof_credentials}}"
+awsprof_backup_file() {
+    local file="$1"
+    local label="$2"
 
     # Check if file exists
     if [[ ! -f "$file" ]]; then
-        awsprof_error "Credentials file not found: $file"
+        awsprof_error "${label} file not found: $file"
         return 1
     fi
 
     # Generate timestamp in YYYYMMDD-HHMMSS format
-    local timestamp=$(date +%Y%m%d-%H%M%S)
+    local timestamp
+    timestamp=$(date +%Y%m%d-%H%M%S)
     local backup_file="${file}.bak.${timestamp}"
 
     # Copy to backup
@@ -162,12 +187,23 @@ awsprof_backup_credentials() {
     return 0
 }
 
-awsprof_ini_write_section() {
-    local section="$1"
-    shift
-    local kvpairs=("$@")
+awsprof_backup_credentials() {
+    # Use AWS_SHARED_CREDENTIALS_FILE if set, otherwise default
+    local file="${1:-${AWS_SHARED_CREDENTIALS_FILE:-$_awsprof_credentials}}"
+    awsprof_backup_file "$file" "Credentials"
+}
 
-    local file="${AWS_SHARED_CREDENTIALS_FILE:-$_awsprof_credentials}"
+awsprof_backup_config() {
+    local file="${1:-${AWS_CONFIG_FILE:-$_awsprof_config}}"
+    awsprof_backup_file "$file" "Config"
+}
+
+awsprof_ini_write_section_to_file() {
+    local section="$1"
+    local file="$2"
+    local label="$3"
+    shift 3
+    local kvpairs=("$@")
 
     # Check if section parameter provided
     if [[ -z "$section" ]]; then
@@ -177,6 +213,12 @@ awsprof_ini_write_section() {
 
     local dir
     dir=$(dirname "$file")
+    if [[ ! -d "$dir" ]]; then
+        if ! mkdir -p "$dir" 2>/dev/null; then
+            awsprof_error "Failed to create directory: $dir"
+            return 1
+        fi
+    fi
     local temp_file
     temp_file=$(mktemp -p "$dir" ".awsprof.XXXXXX") || {
         awsprof_error "Failed to create temp file in: $dir"
@@ -281,7 +323,7 @@ awsprof_ini_write_section() {
 
     # Create backup if file exists
     if [[ -f "$file" ]]; then
-        awsprof_backup_credentials "$file" || {
+        awsprof_backup_file "$file" "$label" || {
             rm -f "$temp_file"
             return 1
         }
@@ -289,7 +331,7 @@ awsprof_ini_write_section() {
 
     # Atomic move
     if ! mv "$temp_file" "$file" 2>/dev/null; then
-        awsprof_error "Failed to write credentials file: $file"
+        awsprof_error "Failed to write ${label,,} file: $file"
         rm -f "$temp_file"
         return 1
     fi
@@ -297,9 +339,17 @@ awsprof_ini_write_section() {
     return 0
 }
 
-awsprof_ini_delete_section() {
+awsprof_ini_write_section() {
     local section="$1"
+    shift
     local file="${AWS_SHARED_CREDENTIALS_FILE:-$_awsprof_credentials}"
+    awsprof_ini_write_section_to_file "$section" "$file" "Credentials" "$@"
+}
+
+awsprof_ini_delete_section_from_file() {
+    local section="$1"
+    local file="$2"
+    local label="$3"
 
     # Check if section parameter provided
     if [[ -z "$section" ]]; then
@@ -309,7 +359,7 @@ awsprof_ini_delete_section() {
 
     # Check if file exists
     if [[ ! -f "$file" ]]; then
-        awsprof_error "Credentials file not found: $file"
+        awsprof_error "${label} file not found: $file"
         rm -f "$temp_file"
         return 1
     fi
@@ -383,19 +433,112 @@ awsprof_ini_delete_section() {
     fi
 
     # Create backup
-    awsprof_backup_credentials "$file" || {
+    awsprof_backup_file "$file" "$label" || {
         rm -f "$temp_file"
         return 1
     }
 
     # Atomic move
     if ! mv "$temp_file" "$file" 2>/dev/null; then
-        awsprof_error "Failed to write credentials file: $file"
+        awsprof_error "Failed to write ${label,,} file: $file"
         rm -f "$temp_file"
         return 1
     fi
 
     return 0
+}
+
+awsprof_ini_delete_section() {
+    local section="$1"
+    local file="${AWS_SHARED_CREDENTIALS_FILE:-$_awsprof_credentials}"
+    awsprof_ini_delete_section_from_file "$section" "$file" "Credentials"
+}
+
+awsprof_config_update_profile_section() {
+    local profile_name="$1"
+    local region="${2:-}"
+    local output="${3:-}"
+    local file="${AWS_CONFIG_FILE:-$_awsprof_config}"
+    local section_name=""
+
+    if [[ -z "$profile_name" ]]; then
+        awsprof_error "Profile name required"
+        return 1
+    fi
+
+    if [[ "$profile_name" == "default" ]]; then
+        section_name="default"
+    else
+        section_name="profile $profile_name"
+    fi
+
+    local section_exists=0
+    local existing_kvs=""
+    if [[ -f "$file" ]]; then
+        local sections
+        if ! sections=$(awsprof_config_list_sections "$file"); then
+            return 1
+        fi
+        if printf '%s\n' "$sections" | grep -Fxq "$section_name"; then
+            section_exists=1
+            if ! existing_kvs=$(awsprof_config_read_section "$section_name" "$file"); then
+                return 1
+            fi
+        fi
+    fi
+
+    local kvpairs=()
+    local line key val
+    if [[ -n "$existing_kvs" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            key="${line%%=*}"
+            val="${line#*=}"
+            if [[ "$key" == "region" || "$key" == "output" ]]; then
+                continue
+            fi
+            kvpairs+=("$key=$val")
+        done <<< "$existing_kvs"
+    fi
+
+    if [[ -n "$region" ]]; then
+        kvpairs+=("region=$region")
+    fi
+    if [[ -n "$output" ]]; then
+        kvpairs+=("output=$output")
+    fi
+
+    if [[ ${#kvpairs[@]} -eq 0 ]]; then
+        if [[ $section_exists -eq 1 ]]; then
+            awsprof_ini_delete_section_from_file "$section_name" "$file" "Config"
+        fi
+        return 0
+    fi
+
+    awsprof_ini_write_section_to_file "$section_name" "$file" "Config" "${kvpairs[@]}"
+}
+
+awsprof_config_delete_profile_section() {
+    local profile_name="$1"
+    local file="${AWS_CONFIG_FILE:-$_awsprof_config}"
+    local section_name=""
+
+    if [[ -z "$profile_name" ]]; then
+        awsprof_error "Profile name required"
+        return 1
+    fi
+
+    if [[ ! -f "$file" ]]; then
+        return 0
+    fi
+
+    if [[ "$profile_name" == "default" ]]; then
+        section_name="default"
+    else
+        section_name="profile $profile_name"
+    fi
+
+    awsprof_ini_delete_section_from_file "$section_name" "$file" "Config"
 }
 
 #=== UTILITY FUNCTIONS ===
@@ -478,6 +621,18 @@ awsprof_util_read_global_awsprofile() {
 awsprof_util_is_valid_profile_name() {
     local profile_name="$1"
     [[ "$profile_name" =~ ^[A-Za-z0-9._-]+$ ]]
+}
+
+awsprof_util_is_valid_output_format() {
+    local output="$1"
+    case "$output" in
+        json|text|table|yaml|yaml-stream)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 }
 
 #=== PROFILE COMMANDS ===
@@ -583,9 +738,13 @@ awsprof_cmd_add() {
     awsprof_msg "Adding new profile: $profile_name"
     local access_key_id
     local secret_access_key
+    local region
+    local output
     read -p "AWS Access Key ID: " access_key_id
     read -s -p "AWS Secret Access Key: " secret_access_key
     printf '\n' >&2  # Newline after hidden input
+    read -p "AWS Default Region (optional): " region
+    read -p "AWS Default Output Format (optional): " output
 
     # Validate credentials are not empty
     if [[ -z "$access_key_id" ]] || [[ -z "$secret_access_key" ]]; then
@@ -602,12 +761,23 @@ awsprof_cmd_add() {
         awsprof_error "Invalid Secret Access Key format"
         return 1
     fi
+    if [[ -n "$output" ]] && ! awsprof_util_is_valid_output_format "$output"; then
+        awsprof_error "Invalid output format (supported: json, text, table, yaml, yaml-stream)"
+        return 1
+    fi
+
+    # Mirror config defaults (region/output) when provided
+    if ! awsprof_config_update_profile_section "$profile_name" "$region" "$output"; then
+        awsprof_error "Failed to update config defaults for profile"
+        return 1
+    fi
 
     # Write profile using Story 2.1 function
     if ! awsprof_ini_write_section "$profile_name" \
         "aws_access_key_id=$access_key_id" \
         "aws_secret_access_key=$secret_access_key"; then
         awsprof_error "Failed to add profile"
+        awsprof_config_delete_profile_section "$profile_name" >/dev/null 2>&1 || true
         return 1
     fi
 
@@ -650,9 +820,36 @@ awsprof_cmd_edit() {
     awsprof_msg "Editing profile: $profile_name"
     local access_key_id
     local secret_access_key
+    local region
+    local output
     read -p "AWS Access Key ID: " access_key_id
     read -s -p "AWS Secret Access Key: " secret_access_key
     printf '\n' >&2  # Newline after hidden input
+    read -p "AWS Default Region (optional): " region
+    read -p "AWS Default Output Format (optional): " output
+
+    # Capture existing config section for rollback
+    local config_file="${AWS_CONFIG_FILE:-$_awsprof_config}"
+    local section_name=""
+    local had_config_section=0
+    local prev_config_kvs=""
+    if [[ "$profile_name" == "default" ]]; then
+        section_name="default"
+    else
+        section_name="profile $profile_name"
+    fi
+    if [[ -f "$config_file" ]]; then
+        local sections
+        if ! sections=$(awsprof_config_list_sections "$config_file"); then
+            return 1
+        fi
+        if printf '%s\n' "$sections" | grep -Fxq "$section_name"; then
+            had_config_section=1
+            if ! prev_config_kvs=$(awsprof_config_read_section "$section_name" "$config_file"); then
+                return 1
+            fi
+        fi
+    fi
 
     # Validate credentials are not empty
     if [[ -z "$access_key_id" ]] || [[ -z "$secret_access_key" ]]; then
@@ -669,12 +866,39 @@ awsprof_cmd_edit() {
         awsprof_error "Invalid Secret Access Key format"
         return 1
     fi
+    if [[ -n "$output" ]] && ! awsprof_util_is_valid_output_format "$output"; then
+        awsprof_error "Invalid output format (supported: json, text, table, yaml, yaml-stream)"
+        return 1
+    fi
+
+    # Mirror config defaults (region/output) when provided
+    if ! awsprof_config_update_profile_section "$profile_name" "$region" "$output"; then
+        awsprof_error "Failed to update config defaults for profile"
+        return 1
+    fi
 
     # Write profile using Story 2.1 function
     if ! awsprof_ini_write_section "$profile_name" \
         "aws_access_key_id=$access_key_id" \
         "aws_secret_access_key=$secret_access_key"; then
         awsprof_error "Failed to update profile"
+        if [[ $had_config_section -eq 1 ]]; then
+            local rollback_pairs=()
+            local line
+            if [[ -n "$prev_config_kvs" ]]; then
+                while IFS= read -r line; do
+                    [[ -z "$line" ]] && continue
+                    rollback_pairs+=("$line")
+                done <<< "$prev_config_kvs"
+            fi
+            if [[ ${#rollback_pairs[@]} -gt 0 ]]; then
+                awsprof_ini_write_section_to_file "$section_name" "$config_file" "Config" "${rollback_pairs[@]}" || true
+            else
+                awsprof_ini_delete_section_from_file "$section_name" "$config_file" "Config" || true
+            fi
+        else
+            awsprof_ini_delete_section_from_file "$section_name" "$config_file" "Config" || true
+        fi
         return 1
     fi
 
@@ -713,9 +937,52 @@ awsprof_cmd_remove() {
         return 1
     fi
 
+    # Capture existing config section for rollback
+    local config_file="${AWS_CONFIG_FILE:-$_awsprof_config}"
+    local section_name=""
+    local had_config_section=0
+    local prev_config_kvs=""
+    if [[ "$profile_name" == "default" ]]; then
+        section_name="default"
+    else
+        section_name="profile $profile_name"
+    fi
+    if [[ -f "$config_file" ]]; then
+        local sections
+        if ! sections=$(awsprof_config_list_sections "$config_file"); then
+            return 1
+        fi
+        if printf '%s\n' "$sections" | grep -Fxq "$section_name"; then
+            had_config_section=1
+            if ! prev_config_kvs=$(awsprof_config_read_section "$section_name" "$config_file"); then
+                return 1
+            fi
+        fi
+    fi
+
+    if ! awsprof_config_delete_profile_section "$profile_name"; then
+        awsprof_error "Failed to remove config defaults for profile"
+        return 1
+    fi
+
     # Delete the profile using Story 2.1 function
     if ! awsprof_ini_delete_section "$profile_name"; then
         awsprof_error "Failed to remove profile"
+        if [[ $had_config_section -eq 1 ]]; then
+            local rollback_pairs=()
+            local line
+            if [[ -n "$prev_config_kvs" ]]; then
+                while IFS= read -r line; do
+                    [[ -z "$line" ]] && continue
+                    rollback_pairs+=("$line")
+                done <<< "$prev_config_kvs"
+            fi
+            if [[ ${#rollback_pairs[@]} -gt 0 ]]; then
+                awsprof_ini_write_section_to_file "$section_name" "$config_file" "Config" "${rollback_pairs[@]}" || true
+            else
+                awsprof_ini_delete_section_from_file "$section_name" "$config_file" "Config" || true
+            fi
+        fi
         return 1
     fi
 
@@ -789,6 +1056,95 @@ awsprof_cmd_check() {
     echo "$profile_name"
 
     return 0
+}
+
+awsprof_cmd_config_show() {
+    local profile_name="$1"
+    local extra_arg="$2"
+    local file="${AWS_CONFIG_FILE:-$_awsprof_config}"
+
+    if [[ -z "$profile_name" ]]; then
+        awsprof_error "Profile name required"
+        awsprof_msg "Usage: awsprof config show <profile-name>"
+        return 1
+    fi
+
+    if [[ -n "$extra_arg" ]]; then
+        awsprof_error "Too many arguments: expected profile name only"
+        awsprof_msg "Usage: awsprof config show <profile-name>"
+        return 1
+    fi
+
+    if [[ ! -f "$file" ]]; then
+        awsprof_error "Config file not found: $file"
+        return 1
+    fi
+
+    local section_name=""
+    if [[ "$profile_name" == "default" ]]; then
+        section_name="default"
+    else
+        section_name="profile $profile_name"
+    fi
+
+    local sections
+    if ! sections=$(awsprof_config_list_sections "$file"); then
+        return 1
+    fi
+    if ! printf '%s\n' "$sections" | grep -Fxq "$section_name"; then
+        awsprof_error "Profile '$profile_name' not found in config"
+        return 1
+    fi
+
+    local section_kvs=""
+    if ! section_kvs=$(awsprof_config_read_section "$section_name" "$file"); then
+        return 1
+    fi
+
+    local region="not set"
+    local output="not set"
+    local line key val
+    if [[ -n "$section_kvs" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            key="${line%%=*}"
+            val="${line#*=}"
+            val="${val%%[[:space:]]#*}"
+            val="${val%%[[:space:]];*}"
+            val="${val#"${val%%[![:space:]]*}"}"
+            val="${val%"${val##*[![:space:]]}"}"
+            case "$key" in
+                region) region="$val" ;;
+                output) output="$val" ;;
+            esac
+        done <<< "$section_kvs"
+    fi
+
+    printf 'region: %s\n' "$region"
+    printf 'output: %s\n' "$output"
+
+    return 0
+}
+
+awsprof_cmd_config() {
+    local subcmd="${1:-}"
+    shift || true
+
+    case "$subcmd" in
+        show)
+            awsprof_cmd_config_show "${1:-}" "${2:-}"
+            return $?
+            ;;
+        ""|help|--help|-h)
+            awsprof_msg "Usage: awsprof config show <profile-name>"
+            return 1
+            ;;
+        *)
+            awsprof_error "Unknown config command: ${subcmd}"
+            awsprof_msg "Usage: awsprof config show <profile-name>"
+            return 1
+            ;;
+    esac
 }
 
 #=== SHELL INTEGRATION ===
@@ -1043,6 +1399,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             awsprof_cmd_check
             exit $?
             ;;
+        config)
+            awsprof_cmd_config "${@:2}"
+            exit $?
+            ;;
         --hook-detect-profile)
             # Internal hook for testing/PROMPT_COMMAND
             awsprof_hook_detect_profile
@@ -1064,6 +1424,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             awsprof_msg "  edit <profile>    Edit an existing AWS profile"
             awsprof_msg "  remove <profile>  Remove an AWS profile"
             awsprof_msg "  import            Import profiles from credentials file"
+            awsprof_msg "  config show <p>   Show region/output for a profile"
             awsprof_msg "  check             Check .awsprofile file in current directory (single line: profile name)"
             awsprof_msg "                   Example .awsprofile: client-acme (safe to commit)"
             awsprof_msg "  init              Initialize shell integration (use with eval)"

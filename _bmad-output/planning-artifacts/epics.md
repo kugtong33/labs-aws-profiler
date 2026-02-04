@@ -166,9 +166,9 @@ This document provides the complete epic and story breakdown for labs-aws-profil
 | FR37 | Epic 4 | Use global .awsprofile when project file missing |
 | FR38 | Epic 4 | Direct use of .awsprofile without mismatch prompts |
 | FR39 | Epic 4 | Warn and clear AWS_PROFILE if profile missing |
-| FR40 | Epic 5 | Set default AWS region for a profile |
-| FR41 | Epic 5 | Set default AWS output format for a profile |
-| FR42 | Epic 5 | View region/output for a profile |
+| FR40 | Epic 5 | Mirror config region on add/edit |
+| FR41 | Epic 5 | Mirror config output on add/edit |
+| FR42 | Epic 5 | Show profile config summary |
 | FR43 | Epic 5 | Preserve existing config entries when editing |
 
 ## Epic List
@@ -187,6 +187,10 @@ Users get automatic warnings when their active profile doesn't match the project
 ### Epic 4: AWS Profile File Improvements
 Users can rely on project and global .awsprofile files to set the correct profile automatically without mismatch prompts.
 **FRs covered:** FR35, FR36, FR37, FR38, FR39
+
+### Epic 5: Unified Profile + Config Management
+Users manage credentials and config together so add/edit/remove mirrors config defaults per profile.
+**FRs covered:** FR1, FR2, FR3, FR40, FR41, FR42, FR43
 
 ---
 
@@ -869,108 +873,82 @@ So that I do not accidentally run commands against the wrong account.
 
 ---
 
-## Epic 5: AWS Config Support
+## Epic 5: Unified Profile + Config Management
 
-Users can manage AWS config settings (region and output) alongside profiles so their CLI behavior is consistent and discoverable.
+Users manage credentials and config together so add/edit/remove mirrors config defaults per profile.
 
 **Proposed FR coverage (new):**
-- FR40: User can set a default AWS region for a profile (writes to `~/.aws/config`)
-- FR41: User can set a default AWS output format for a profile (writes to `~/.aws/config`)
-- FR42: User can view the current region/output for a profile (reads from `~/.aws/config`)
-- FR43: System preserves existing config entries when adding or editing config settings
+- FR1, FR2, FR3: Add/edit/remove profiles
+- FR40: Set default AWS region for a profile
+- FR41: Set default AWS output format for a profile
+- FR42: View current region/output for a profile
+- FR43: Preserve existing config entries when adding or editing config settings
 
-### Story 5.1: Read AWS Config Defaults
+### Story 5.1: Add Profile Mirrors Config
 
 As an infrastructure developer,
-I want awsprof to read region and output settings from `~/.aws/config`,
-So that I can see what defaults apply to each profile.
+I want awsprof add to write both credentials and config defaults together,
+So that profile creation is complete and consistent.
 
 **Acceptance Criteria:**
 
-**Given** a `~/.aws/config` file exists with `[profile client-acme]` entries
-**When** awsprof reads config settings for that profile
-**Then** it returns the `region` and `output` values if present (FR42)
-**And** it handles profiles without those keys gracefully
+**Given** the user runs `awsprof add client-acme`
+**When** prompts are completed for access key, secret key, region, and output
+**Then** `~/.aws/credentials` contains the new profile (FR1)
+**And** `~/.aws/config` contains `[profile client-acme]` with `region`/`output` if provided (FR40, FR41)
+**And** existing config entries are preserved (FR43)
 
-**Given** a default profile section `[default]` exists
-**When** awsprof reads config settings for the default profile
-**Then** it returns values from `[default]` (FR42)
-
-**Given** the config file does not exist
-**When** config settings are requested
-**Then** awsprof reports "No config file found at ~/.aws/config" to stderr
-**And** exits with status code 0 (informational)
+**Given** the user leaves region or output blank
+**When** the add command completes
+**Then** the corresponding config key is omitted (FR40, FR41)
 
 **Technical Requirements:**
-- Reads AWS config file format (profile sections are `profile NAME`, default is `[default]`)
-- Uses awk-based parsing (Architecture)
-- Messages to stderr, data to stdout
+- Atomic writes + timestamped backups for both files
+- `chmod 600` on both files after write
 
 ---
 
-### Story 5.2: Set Region for Profile
+### Story 5.2: Edit Profile Mirrors Config
 
 As an infrastructure developer,
-I want to set a default AWS region for a profile,
-So that AWS CLI commands automatically target the correct region.
+I want awsprof edit to update credentials and config defaults together,
+So that profile changes stay in sync.
 
 **Acceptance Criteria:**
 
-**Given** the user runs `awsprof config set-region client-acme us-east-1`
-**When** the command executes
-**Then** `~/.aws/config` contains or updates `[profile client-acme]` with `region = us-east-1` (FR40)
+**Given** the user runs `awsprof edit client-acme`
+**When** prompts are completed for access key, secret key, region, and output
+**Then** credentials are updated in `~/.aws/credentials` (FR2)
+**And** `~/.aws/config` updates `[profile client-acme]` with provided region/output (FR40, FR41)
 **And** existing config entries are preserved (FR43)
-**And** the command exits with status code 0
 
-**Given** the user sets a region for the default profile
-**When** the command executes
-**Then** `[default]` is updated with `region = ...` (FR40)
-
-**Given** the config file does not exist
-**When** the region is set
-**Then** the file is created with correct INI format (FR40)
-**And** permissions are set to 600
-
-**Given** the user provides an invalid region format
-**When** validation occurs
-**Then** no region validation is performed (any non-empty value is accepted)
-**And** the command exits with status code 0
+**Given** the user leaves region or output blank
+**When** the edit command completes
+**Then** the corresponding config key is removed or left unset for that profile
 
 **Technical Requirements:**
-- Writes to `~/.aws/config` with atomic temp + mv pattern
-- Creates timestamped backups before modifying existing config
-- Preserves unrelated sections and keys
+- Atomic writes + timestamped backups for both files
+- `chmod 600` on both files after write
 
 ---
 
-### Story 5.3: Set Output Format for Profile
+### Story 5.3: Remove Profile Mirrors Config
 
 As an infrastructure developer,
-I want to set a default AWS output format for a profile,
-So that CLI outputs are consistent (json, text, table).
+I want awsprof remove to delete config defaults for the same profile,
+So that no stale config remains after profile removal.
 
 **Acceptance Criteria:**
 
-**Given** the user runs `awsprof config set-output client-acme json`
-**When** the command executes
-**Then** `~/.aws/config` contains or updates `[profile client-acme]` with `output = json` (FR41)
-**And** existing config entries are preserved (FR43)
-**And** the command exits with status code 0
-
-**Given** the user sets output for the default profile
-**When** the command executes
-**Then** `[default]` is updated with `output = ...` (FR41)
-
-**Given** the user provides an unsupported output format
-**When** validation occurs
-**Then** a clear error message is displayed to stderr
-**And** the command exits with status code 1
-**And** only these formats are accepted: `json`, `text`, `table`
+**Given** the user runs `awsprof remove client-acme`
+**When** the command completes
+**Then** the profile is removed from `~/.aws/credentials` (FR3)
+**And** the corresponding `[profile client-acme]` section is removed from `~/.aws/config` (FR43)
+**And** other config profiles remain unchanged (FR43)
 
 **Technical Requirements:**
-- Writes to `~/.aws/config` with atomic temp + mv pattern
-- Creates timestamped backups before modifying existing config
-- Preserves unrelated sections and keys
+- Atomic writes + timestamped backups for both files
+- `chmod 600` on both files after write
 
 ---
 

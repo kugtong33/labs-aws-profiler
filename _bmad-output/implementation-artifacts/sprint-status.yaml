@@ -72,3 +72,9 @@ development_status:
   4-3-direct-use-without-mismatch-checks: done
   4-4-missing-profile-handling: done
   epic-4-retrospective: optional
+
+  epic-5: in-progress
+  5-1-add-profile-mirrors-config: done
+  5-2-edit-profile-mirrors-config: done
+  5-3-remove-profile-mirrors-config: done
+  5-4-show-profile-config-summary: done
