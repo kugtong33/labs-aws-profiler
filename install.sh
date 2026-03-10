@@ -3,16 +3,11 @@
 # awsprof - AWS Profile Management Tool
 # Installation script for curl | bash distribution
 #
-# Version: 0.1.1
-#
 # Installation command:
-#   curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/heads/main/install.sh | bash
 #
 # Disable ANSI colors (for terminals without color support):
-#   curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/0.1.1/install.sh | bash -s -- --no-color
-#
-# Install latest from main (HEAD):
-#   curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/heads/main/install.sh | bash -s -- --head
+#   curl -fsSL https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/heads/main/install.sh | bash -s -- --no-color
 #
 # This script:
 # 1. Downloads awsprof to ~/.local/bin/
@@ -21,10 +16,6 @@
 # 4. Verifies installation
 
 set -euo pipefail
-
-# Version information
-VERSION="0.1.1"
-RELEASE_TAG="0.1.1"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -40,8 +31,8 @@ readonly BASHRC="${HOME}/.bashrc"
 readonly BASHRC_BACKUP="${HOME}/.bashrc.backup.$(date +%s)"
 
 # GitHub URLs
-GITHUB_RAW_URL="https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/${RELEASE_TAG}"
-AWSPROF_URL="${GITHUB_RAW_URL}/awsprof"
+readonly GITHUB_RAW_URL="https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/heads/main"
+readonly AWSPROF_URL="${GITHUB_RAW_URL}/awsprof"
 
 # Helper functions
 print_header() {
@@ -208,13 +199,6 @@ verify_installation() {
 
 # Main installation flow
 main() {
-    # Handle install from HEAD (main branch)
-    if [[ "${1:-}" == "--head" ]]; then
-        VERSION="HEAD"
-        RELEASE_TAG="main"
-        shift
-    fi
-
     # Handle color disable flag
     if [[ "${1:-}" == "--no-color" ]]; then
         RED=""
@@ -225,15 +209,7 @@ main() {
         shift
     fi
 
-    # Update download URLs after flag handling
-    if [[ "$RELEASE_TAG" == "main" ]]; then
-        GITHUB_RAW_URL="https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/heads/${RELEASE_TAG}"
-    else
-        GITHUB_RAW_URL="https://raw.githubusercontent.com/kugtong33/labs-aws-profiler/refs/tags/${RELEASE_TAG}"
-    fi
-    AWSPROF_URL="${GITHUB_RAW_URL}/awsprof"
-
-    print_header "awsprof Installation v${VERSION}"
+    print_header "awsprof Installation (latest)"
     print_info "Installation destination: $INSTALL_FILE"
     echo ""
 
