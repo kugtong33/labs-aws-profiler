@@ -10,7 +10,6 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 fi
 
 #=== CONFIGURATION ===
-_awsprof_version="0.1.1"
 _awsprof_credentials="${AWS_SHARED_CREDENTIALS_FILE:-$HOME/.aws/credentials}"
 _awsprof_config="${AWS_CONFIG_FILE:-$HOME/.aws/config}"
 AWSPROF_EMOJI="${AWSPROF_EMOJI:-0}"
@@ -1413,7 +1412,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             exit $?
             ;;
         help|--help|-h|"")
-            awsprof_msg "awsprof v${_awsprof_version}"
+            awsprof_msg "awsprof"
             awsprof_msg "Usage: awsprof <command>"
             awsprof_msg ""
             awsprof_msg "Commands:"
